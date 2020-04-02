@@ -6,8 +6,8 @@ import Canvas2d from './canvas2d';
 
 // refs: 'A1:C3'
 // return: [row-start, col-start, row-end, col-end]
-function refs2area(refs) {
-  const ary = refs.split(':');
+function ref2area(ref) {
+  const ary = ref.split(':');
   const s = expr2xy(ary[0]);
   const e = expr2xy(ary[1]);
   return [s[1], s[0], e[1], e[0], e[1] - s[1], e[0] - s[0]];
@@ -34,7 +34,7 @@ function maxSpansInMerges(...mergess) {
   const spans = [0, 0];
   mergess.forEach((merges) => {
     merges.forEach((merge) => {
-      const [,,,, rn, cn] = refs2area(merge);
+      const [,,,, rn, cn] = ref2area(merge);
       if (rn > spans[0]) spans[0] = rn;
       if (cn > spans[1]) spans[1] = cn;
     });
@@ -121,7 +121,7 @@ function renderCells(draw, area, rows, cols, cell, cellStyle, hlArea, hlStyle, m
   }
   if (merges && merges.length > 0) {
     merges.forEach((merge) => {
-      const [mrs, mcs, mre, mce] = refs2area(merge);
+      const [mrs, mcs, mre, mce] = ref2area(merge);
       // console.log('merge:', merge, [mrs, mcs, mre, mce], area);
       if (mrs <= re && mcs <= ce && rs <= mre && cs <= mce) {
         // console.log('merge>>:', merge);
