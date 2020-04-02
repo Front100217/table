@@ -4,7 +4,7 @@ const resolve = dir => path.join(__dirname, '..', dir);
 
 module.exports = {
   entry: {
-    'wolf-table-core': './src/index.js',
+    'wolf-table-render': './src/index.js',
   },
   module: {
     rules: [

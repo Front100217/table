@@ -63,18 +63,32 @@ function textLine(type, align, valign, x, y, w, h) {
   ];
 }
 
-function renderBorder(draw, width, height, {
-  top, right, bottom, left,
-}) {
-  draw.save();
-  if (top) draw.lineStyle(...top).line([0, 0], [width, 0]);
-  if (right) draw.lineStyle(...right).line([width, 0], [width, height]);
-  if (bottom) draw.lineStyle(...bottom).line([0, height], [width, height]);
-  if (left) draw.lineStyle(...left).line([0, 0], [0, height]);
-  draw.restore();
+function renderBorder(draw, width, height, border) {
+  if (border) {
+    const {
+      top, right, bottom, left,
+    } = border;
+    draw.save();
+    if (top) draw.lineStyle(...top).line([0, 0], [width, 0]);
+    if (right) draw.lineStyle(...right).line([width, 0], [width, height]);
+    if (bottom) draw.lineStyle(...bottom).line([0, height], [width, height]);
+    if (left) draw.lineStyle(...left).line([0, 0], [0, height]);
+    draw.restore();
+  }
+}
+
+function fontString(family, size, italic, bold) {
+  if (family && size) {
+    let font = '';
+    if (italic) font += 'italic ';
+    if (bold) font += 'bold ';
+    return `${font} ${size}pt ${family}`;
+  }
+  return undefined;
 }
 
 // draw: Canvas2d
+// style:
 export function cellRender(draw, text, {
   left, top, width, height,
 }, {
@@ -88,19 +102,19 @@ export function cellRender(draw, text, {
     .translate(left, top);
 
   // border
-  renderBorder(draw, width, height, border || {});
+  renderBorder(draw, width, height, border);
 
   // clip
-  draw.attr({ fillStyle: bgcolor || '#ffffff' })
-    .rect(1, 1, width - 2, height - 2)
+  draw.attr({ fillStyle: bgcolor })
+    .rect(0.5, 0.5, width - 1, height - 1)
     .clip()
     .fill();
 
-  // text
+  // text style
   draw.save().beginPath().attr({
     textAlign: align,
     textBaseline: valign,
-    font: `${italic ? 'italic' : ''} ${bold ? 'bold' : ''} ${fontSize}pt ${fontFamily}`,
+    font: fontString(fontFamily, fontSize, italic, bold),
     fillStyle: color,
   });
 

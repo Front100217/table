@@ -36,7 +36,14 @@ export default class Canvas2d {
   }
 
   attr(options) {
-    Object.assign(this.ctx, options);
+    if (typeof options === 'string') {
+      return this.ctx[options];
+    }
+    Object.entries(options).forEach(([k, v]) => {
+      if (v !== undefined && v !== null) {
+        this.ctx[k] = v;
+      }
+    });
     return this;
   }
 
