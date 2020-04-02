@@ -4,6 +4,15 @@ import { cellRender } from './cell-render';
 import { stringAt, expr2xy } from './alphabet';
 import Canvas2d from './canvas2d';
 
+// refs: 'A1:C3'
+// return: [row-start, col-start, row-end, col-end]
+function refs2area(refs) {
+  const ary = refs.split(':');
+  const s = expr2xy(ary[0]);
+  const e = expr2xy(ary[1]);
+  return [s[1], s[0], e[1], e[0], e[1] - s[1], e[0] - s[0]];
+}
+
 // area: [row-start, col-start, row-end, col-end]
 // r: row-index
 function inAreaRow(area, r) {
@@ -21,6 +30,18 @@ function inArea(area, r, c) {
   return inAreaRow(area, r) && inAreaCol(area, c);
 }
 
+function maxSpansInMerges(...mergess) {
+  const spans = [0, 0];
+  mergess.forEach((merges) => {
+    merges.forEach((merge) => {
+      const [,,,, rn, cn] = refs2area(merge);
+      if (rn > spans[0]) spans[0] = rn;
+      if (cn > spans[1]) spans[1] = cn;
+    });
+  });
+  return spans;
+}
+
 // draw
 // area: [row-start, col-start, row-end, col-end, width, height]
 // rows: Function<{y, h}>
@@ -33,13 +54,13 @@ function renderLines(draw, area, rows, cols, { width, color }) {
       .attr({ lineWidth: width, strokeStyle: color });
 
     for (let ri = rs; ri <= re; ri += 1) {
-      const { y } = rows(ri);
-      draw.line([0, y], [aw, y]);
+      const { y, h } = rows(ri);
+      draw.line([0, y + h], [aw, y + h]);
     }
 
     for (let ci = cs; ci <= ce; ci += 1) {
-      const { x } = cols(ci);
-      draw.line([x, 0], [x, ah]);
+      const { x, w } = cols(ci);
+      draw.line([x + w, 0], [x + w, ah]);
     }
     draw.restore();
   }
@@ -66,7 +87,7 @@ function renderCell(draw, ri, ci, cell, cellRect, cellStyle, hlArea, hlStyle) {
   }
   // console.log('text:', text, ', x:', x, ', y:', y, style);
   cellRender(draw, text, cellRect, style);
-  if (inArea(hlArea, ri, ci)) {
+  if (hlArea && inArea(hlArea, ri, ci)) {
     const {
       left, top, width, height,
     } = cellRect;
@@ -100,9 +121,7 @@ function renderCells(draw, area, rows, cols, cell, cellStyle, hlArea, hlStyle, m
   }
   if (merges && merges.length > 0) {
     merges.forEach((merge) => {
-      const refs = merge.split(':');
-      const [mcs, mrs] = expr2xy(refs[0]);
-      const [mce, mre] = expr2xy(refs[1]);
+      const [mrs, mcs, mre, mce] = refs2area(merge);
       // console.log('merge:', merge, [mrs, mcs, mre, mce], area);
       if (mrs <= re && mcs <= ce && rs <= mre && cs <= mce) {
         // console.log('merge>>:', merge);
@@ -120,6 +139,12 @@ function renderCells(draw, area, rows, cols, cell, cellStyle, hlArea, hlStyle, m
     });
   }
   draw.restore();
+}
+
+function renderContent(draw, area, rows, cols,
+  cell, cellStyle, lineStyle, hlArea, hlStyle, merges) {
+  renderLines(draw, area, rows, cols, lineStyle);
+  renderCells(draw, area, rows, cols, cell, cellStyle, hlArea, hlStyle, merges);
 }
 
 class TableRender {
@@ -147,6 +172,10 @@ class TableRender {
     this.$indexColWidth = 60;
     this.$indexColCell = (r, c) => stringAt(c);
     this.$indexMerges = [];
+    this.$indexLineStyle = {
+      width: 1,
+      color: '#e6e6e6',
+    };
     // index-style
     this.$indexStyle = {
       bgcolor: '#f4f5f8',
@@ -180,7 +209,7 @@ class TableRender {
     };
     this.$cell = () => '';
     // ['A1:B2',...]
-    this.merges = [];
+    this.$merges = [];
   }
 
   get indexRowsHeight() {
@@ -200,6 +229,7 @@ class TableRender {
       $indexStyle, $lineStyle, $indexColWidth,
       $highlightArea, $highlightStyle,
       $indexRowHeight, $indexRowsLength, indexRowsHeight,
+      $merges, $indexMerges, $indexLineStyle,
     } = this;
     draw.resize($width, $height);
 
@@ -225,43 +255,74 @@ class TableRender {
     }
     cols.set(colEnd, { x: totalw, w: this.$colWidth(colEnd) });
 
-    if ($indexColWidth > 0 && indexRowsHeight > 0) {
-      draw.save().attr({ fillStyle: $indexStyle.bgcolor })
-        .rect(0, 0, $indexColWidth, indexRowsHeight)
-        .fill()
-        .restore();
+    // <- cols, rows for merges
+    if ($rowStart > 0 || $colStart > 0) {
+      const [rowMaxSpan, colMaxSpan] = maxSpansInMerges($merges, $indexMerges);
+      if ($rowStart > 0 && rowMaxSpan > 0) {
+        totalh = 0;
+        for (let i = 1; i <= rowMaxSpan; i += 1) {
+          const ii = $rowStart - i;
+          if (ii >= 0) {
+            const h = this.$rowHeight(ii);
+            totalh -= h;
+            rows.set(ii, { y: totalh, h });
+          }
+        }
+      }
+      if ($colStart > 0 && colMaxSpan > 0) {
+        totalw = 0;
+        for (let i = 1; i <= colMaxSpan; i += 1) {
+          const ii = $colStart - i;
+          if (ii >= 0) {
+            const w = this.$colWidth(ii);
+            totalw -= w;
+            cols.set(ii, { x: totalw, w });
+          }
+        }
+      }
     }
+
+    // render content
+    draw.save().translate($indexColWidth, indexRowsHeight);
+    renderContent(draw,
+      [$rowStart, $colStart, rowEnd, colEnd, $width, $height],
+      (i) => rows.get(i),
+      (i) => cols.get(i),
+      this.$cell, this.$cellStyle, $lineStyle,
+      $highlightArea, $highlightStyle, $merges);
+    draw.restore();
 
     // render row-index
     if ($indexColWidth > 0) {
       draw.save().translate(0, indexRowsHeight);
-      const area = [$rowStart, 0, rowEnd, 0, $indexColWidth, $height];
-      const colsFunc = () => ({ x: 0, w: $indexColWidth });
-      renderLines(draw, area, (i) => rows.get(i), colsFunc, $lineStyle);
-      renderCells(draw, area, (i) => rows.get(i), colsFunc,
-        this.$indexRowCell, $indexStyle,
+      renderContent(draw,
+        [$rowStart, 0, rowEnd, 0, $indexColWidth, $height],
+        (i) => rows.get(i),
+        () => ({ x: 0, w: $indexColWidth }),
+        this.$indexRowCell, $indexStyle, $indexLineStyle,
         [$highlightArea[0], 0, $highlightArea[2], 0], $highlightStyle);
       draw.restore();
     }
     // render col-index
     if (indexRowsHeight > 0) {
       draw.save().translate($indexColWidth, 0);
-      const area = [0, $colStart, $indexRowsLength - 1, colEnd, $width, indexRowsHeight];
-      const rowsFunc = (i) => ({ y: i * $indexRowHeight, h: $indexRowHeight });
-      renderLines(draw, area, rowsFunc, (i) => cols.get(i), $lineStyle);
-      renderCells(draw, area, rowsFunc, (i) => cols.get(i),
-        this.$indexColCell, $indexStyle,
-        [0, $highlightArea[1], 0, $highlightArea[3]], $highlightStyle,
-        this.$indexMerges);
+      renderContent(draw,
+        [0, $colStart, $indexRowsLength - 1, colEnd, $width, indexRowsHeight],
+        (i) => ({ y: i * $indexRowHeight, h: $indexRowHeight }),
+        (i) => cols.get(i),
+        this.$indexColCell, $indexStyle, $indexLineStyle,
+        [0, $highlightArea[1], 0, $highlightArea[3]], $highlightStyle, $indexMerges);
       draw.restore();
     }
 
-    // render content
-    const area = [$rowStart, $colStart, rowEnd, colEnd, $width, $height];
-    draw.translate($indexColWidth, indexRowsHeight);
-    renderLines(draw, area, (i) => rows.get(i), (i) => cols.get(i), $lineStyle);
-    renderCells(draw, area, (i) => rows.get(i), (i) => cols.get(i),
-      this.$cell, this.$cellStyle, $highlightArea, $highlightStyle, this.$merges);
+    // top-left
+    if ($indexColWidth > 0 && indexRowsHeight > 0) {
+      renderContent(draw,
+        [0, 0, 0, 0, $indexColWidth, indexRowsHeight],
+        () => ({ y: 0, h: indexRowsHeight }),
+        () => ({ x: 0, w: $indexColWidth }),
+        () => '', $indexStyle, $indexLineStyle);
+    }
   }
 }
 
@@ -281,7 +342,7 @@ class TableRender {
 
 // object property
 [
-  'lineStyle', 'cellStyle', 'indexStyle', 'highlightStyle',
+  'lineStyle', 'cellStyle', 'indexStyle', 'indexLineStyle', 'highlightStyle',
 ].forEach((it) => {
   TableRender.prototype[it] = function (arg) {
     Object.assign(this[`$${it}`], arg || {});
