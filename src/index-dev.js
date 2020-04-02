@@ -1,7 +1,7 @@
 // index-dev.js
-import { wolfTableRender } from './index';
+import WolfTableRender from './index';
 
-wolfTableRender(500, 500)
+WolfTableRender.create(500, 500)
   .indexRowsLength(2)
   .indexMerges(['A1:C1', 'D1:D2'])
   .rowStart(5)

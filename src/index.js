@@ -324,6 +324,10 @@ class TableRender {
         () => '', $indexStyle, $indexLineStyle);
     }
   }
+
+  static create(width, height) {
+    return new TableRender(width, height);
+  }
 }
 
 // single property
@@ -350,10 +354,6 @@ class TableRender {
   };
 });
 
-export function wolfTableRender(width, height) {
-  return new TableRender(width, height);
-}
-
 export default TableRender;
 
-window.wolfTableRender = wolfTableRender;
+window.WolfTableRender = TableRender;
