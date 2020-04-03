@@ -5,19 +5,6 @@ import { stringAt } from './alphabet';
 import Canvas2d from './canvas2d';
 import { newArea } from './table-area';
 
-function maxSpansInMerges(area, merges) {
-  const spans = [0, 0];
-  merges.forEach((merge) => {
-    const a = newArea(merge);
-    if (a.intersects(area)) {
-      // console.log('a:', a);
-      if (a.rowLen > spans[0]) spans[0] = a.rowLen;
-      if (a.colLen > spans[1]) spans[1] = a.colLen;
-    }
-  });
-  return spans;
-}
-
 // draw
 // area: TableArea
 // rows: Function<{y, h}>
@@ -98,17 +85,21 @@ function renderCells(draw, area, rows, cols, cell, cellStyle, hl, hlStyle, merge
       const a = newArea(merge);
       // console.log('merge:', merge, [mrs, mcs, mre, mce], area);
       if (a.intersects(area)) {
-        const { rowStart, colStart } = a;
+        const {
+          rowStart, colStart, rowEnd, colEnd,
+        } = a;
         // console.log('rowStart:', rowStart, ', colStart:', colStart);
-        const { x } = cols(colStart);
-        const { y } = rows(rowStart);
+        const { x, w } = cols(colStart, colEnd);
+        const { y, h } = rows(rowStart, rowEnd);
+        /*
         let width = 0;
         let height = 0;
         a.rowEach((i) => { height += rows(i).h; });
         a.colEach((i) => { width += cols(i).w; });
+        */
         // console.log('x:', x, ', y:', y, ', width:', width, ', height:', height);
         renderCell(draw, rowStart, colStart, cell, {
-          left: x, top: y, width, height,
+          left: x, top: y, width: w, height: h,
         }, cellStyle, hl, hlStyle);
       }
     });
@@ -230,47 +221,56 @@ class TableRender {
     }
     cols.set(colEnd, { x: totalw, w: this.$colWidth(colEnd) });
 
-    const viewArea = newArea($rowStart, $colStart, rowEnd, colEnd, $width, $height);
-    const colViewArea = newArea(0, $colStart, $indexRowsLength - 1, colEnd,
-      $width, indexRowsHeight);
+    const rowFunc = (index, eIndex) => {
+      if ((eIndex === undefined || index === eIndex) && rows.has(index)) {
+        return rows.get(index);
+      }
+      // left of $rowStart
+      if (index < $rowStart) {
+        let y = 0;
+        let h = 0;
+        for (let i = index; i <= eIndex; i += 1) {
+          const rh = this.$rowHeight(i);
+          if (i < $rowStart) y -= rh;
+          h += rh;
+        }
+        return { y, h };
+      }
+      const { y } = rows.get(index);
+      let h = 0;
+      for (let i = index; i <= eIndex; i += 1) {
+        h += this.$rowHeight(i);
+      }
+      return { y, h };
+    };
+    const colFunc = (index, eIndex) => {
+      if ((eIndex === undefined || index === eIndex) && cols.has(index)) {
+        return cols.get(index);
+      }
+      // top of $colStart
+      if (index < $colStart) {
+        let x = 0;
+        let w = 0;
+        for (let i = index; i <= eIndex; i += 1) {
+          const cw = this.$colWidth(i);
+          if (i < $colStart) x -= cw;
+          w += cw;
+        }
+        return { x, w };
+      }
+      const { x } = cols.get(index);
+      let w = 0;
+      for (let i = index; i <= eIndex; i += 1) {
+        w += this.$colWidth(i);
+      }
+      return { x, w };
+    };
 
-    // <- cols, rows for merges
-    if ($rowStart > 0 || $colStart > 0) {
-      let [rowMaxSpan, colMaxSpan] = [0, 0];
-      ([rowMaxSpan, colMaxSpan] = maxSpansInMerges(viewArea, $merges));
-      const [, indexColMaxSpan] = maxSpansInMerges(colViewArea, $indexMerges);
-      if (colMaxSpan < indexColMaxSpan) colMaxSpan = indexColMaxSpan;
-      // console.log('rowMaxSpan:', rowMaxSpan, ', colMaxSpan:', colMaxSpan);
-      if ($rowStart > 0 && rowMaxSpan > 0) {
-        totalh = 0;
-        for (let i = 1; i <= rowMaxSpan; i += 1) {
-          const ii = $rowStart - i;
-          if (ii >= 0) {
-            const h = this.$rowHeight(ii);
-            totalh -= h;
-            rows.set(ii, { y: totalh, h });
-          }
-        }
-      }
-      if ($colStart > 0 && colMaxSpan > 0) {
-        totalw = 0;
-        for (let i = 1; i <= colMaxSpan; i += 1) {
-          const ii = $colStart - i;
-          if (ii >= 0) {
-            const w = this.$colWidth(ii);
-            totalw -= w;
-            cols.set(ii, { x: totalw, w });
-          }
-        }
-      }
-    }
+    const viewArea = newArea($rowStart, $colStart, rowEnd, colEnd, $width, $height);
 
     // render content
     draw.save().translate($indexColWidth, indexRowsHeight);
-    renderContent(draw,
-      viewArea,
-      (i) => rows.get(i),
-      (i) => cols.get(i),
+    renderContent(draw, viewArea, rowFunc, colFunc,
       this.$cell, this.$cellStyle, $lineStyle,
       $highlight, $highlightStyle, $merges);
     draw.restore();
@@ -280,7 +280,7 @@ class TableRender {
       draw.save().translate(0, indexRowsHeight);
       renderContent(draw,
         newArea($rowStart, 0, rowEnd, 0, $indexColWidth, $height),
-        (i) => rows.get(i),
+        rowFunc,
         () => ({ x: 0, w: $indexColWidth }),
         this.$indexRowCell, $indexStyle, $indexLineStyle,
         $highlight && $highlight.replace(/\w+/g, 'A'), $highlightStyle);
@@ -290,9 +290,12 @@ class TableRender {
     if (indexRowsHeight > 0) {
       draw.save().translate($indexColWidth, 0);
       renderContent(draw,
-        colViewArea,
-        (i) => ({ y: i * $indexRowHeight, h: $indexRowHeight }),
-        (i) => cols.get(i),
+        newArea(0, $colStart, $indexRowsLength - 1, colEnd, $width, indexRowsHeight),
+        (i, ei) => ({
+          y: i * $indexRowHeight,
+          h: ((ei || i) - i + 1) * $indexRowHeight,
+        }),
+        colFunc,
         this.$indexColCell, $indexStyle, $indexLineStyle,
         $highlight && $highlight.replace(/\d+/g, '0'), $highlightStyle, $indexMerges);
       draw.restore();
