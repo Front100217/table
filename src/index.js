@@ -131,6 +131,13 @@ class TableRender {
       color: '#e6e6e6',
     };
 
+    // freeze: A1
+    this.$freeze = 'A1';
+    this.$freezeLineStyle = {
+      width: 1,
+      color: '#4b89ff',
+    };
+
     // index...
     this.$indexRowHeight = 25;
     this.$indexRowsLength = 1;
@@ -196,13 +203,14 @@ class TableRender {
       $highlight, $highlightStyle,
       $indexRowHeight, $indexRowsLength, indexRowsHeight,
       $merges, $indexMerges, $indexLineStyle,
+      $rowsLength, $colsLength,
     } = this;
     draw.resize($width, $height);
 
     let totalh = 0;
     let rowEnd = $rowStart;
     const rows = new Map();
-    while (totalh < $height) {
+    while (totalh < $height && rowEnd < $rowsLength) {
       const h = this.$rowHeight(rowEnd);
       rows.set(rowEnd, { y: totalh, h });
       totalh += h;
@@ -213,7 +221,7 @@ class TableRender {
     let totalw = 0;
     let colEnd = $colStart;
     const cols = new Map();
-    while (totalw < $width) {
+    while (totalw < $width && $colStart < $colsLength) {
       const w = this.$colWidth(colEnd);
       cols.set(colEnd, { x: totalw, w });
       totalw += w;
@@ -322,7 +330,7 @@ class TableRender {
   'rowHeight', 'colWidth', 'rowStart', 'colStart',
   'indexRowHeight', 'indexRowsLength', 'indexColWidth', 'indexColText',
   'cell', 'indexColCell', 'indexRowCell', 'highlight',
-  'merges', 'indexMerges',
+  'merges', 'indexMerges', 'freeze',
 ].forEach((it) => {
   TableRender.prototype[it] = function (arg) {
     this[`$${it}`] = arg;
@@ -332,7 +340,8 @@ class TableRender {
 
 // object property
 [
-  'lineStyle', 'cellStyle', 'indexStyle', 'indexLineStyle', 'highlightStyle',
+  'lineStyle', 'cellStyle', 'indexStyle', 'indexLineStyle',
+  'highlightStyle', 'freezeLineStyle',
 ].forEach((it) => {
   TableRender.prototype[it] = function (arg) {
     Object.assign(this[`$${it}`], arg || {});

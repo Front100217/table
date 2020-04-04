@@ -10,12 +10,11 @@ export default class TableArea {
     this.height = height;
   }
 
-  get rowLen() {
-    return this.rowEnd - this.rowStart;
-  }
-
-  get colLen() {
-    return this.colEnd - this.colStart;
+  get length() {
+    return [
+      this.rowEnd - this.rowStart,
+      this.colEnd - this.colStart,
+    ];
   }
 
   inRow(index) {
