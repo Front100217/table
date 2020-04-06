@@ -1,69 +1,97 @@
-import { expr2xy } from './alphabet';
+import CellRange from './cell-range';
 
-export default class TableArea {
-  constructor(rowStart, colStart, rowEnd, colEnd, width = 0, height = 0) {
-    this.rowStart = rowStart;
-    this.colStart = colStart;
-    this.rowEnd = rowEnd;
-    this.colEnd = colEnd;
-    this.width = width;
-    this.height = height;
-  }
-
-  get length() {
-    return [
-      this.rowEnd - this.rowStart,
-      this.colEnd - this.colStart,
-    ];
-  }
-
-  inRow(index) {
-    return this.rowStart <= index && index <= this.rowEnd;
-  }
-
-  inCol(index) {
-    return this.colStart <= index && index <= this.colEnd;
-  }
-
-  includes(ri, ci) {
-    return this.inRow(ri) && this.inCol(ci);
+export default class TableArea extends CellRange {
+  constructor(rowStart, colStart, rowEnd, colEnd, colWidth, rowHeight) {
+    super(rowStart, colStart, rowEnd, colEnd);
+    this.colWidth = colWidth;
+    this.rowHeight = rowHeight;
+    this.width = 0;
+    this.height = 0;
+    this.rows = new Map();
+    this.cols = new Map();
+    for (let i = rowStart; i <= rowEnd; i += 1) {
+      const h = rowHeight(i);
+      this.rows.set(i, { y: this.height, h });
+      this.height += h;
+    }
+    for (let i = colStart; i <= colEnd; i += 1) {
+      const w = colWidth(i);
+      this.cols.set(i, { x: this.width, w });
+      this.width += w;
+    }
   }
 
   rowEach(cb) {
-    for (let ri = this.rowStart; ri <= this.rowEnd; ri += 1) {
-      cb(ri);
-    }
-  }
-
-  colEach(cb) {
-    for (let ci = this.colStart; ci <= this.colEnd; ci += 1) {
-      cb(ci);
-    }
-  }
-
-  each(cb) {
-    this.rowEach((ri) => {
-      this.colEach((ci) => (cb(ri, ci)));
+    super.rowEach((i) => {
+      cb(i, this.rows.get(i));
     });
   }
 
-  intersects(other) {
-    return this.rowStart <= other.rowEnd
-      && this.colStart <= other.colEnd
-      && other.rowStart <= this.rowEnd
-      && other.colStart <= this.colEnd;
+  colEach(cb) {
+    super.colEach((i) => {
+      cb(i, this.cols.get(i));
+    });
+  }
+
+  each(cb) {
+    this.rowEach((ri, { y, h }) => {
+      this.colEach((ci, { x, w }) => {
+        cb(ri, ci, {
+          x, y, w, h,
+        });
+      });
+    });
+  }
+
+  row(index, eIndex) {
+    const { rows, rowStart, rowHeight } = this;
+    if ((eIndex === undefined || index === eIndex) && rows.has(index)) {
+      return rows.get(index);
+    }
+    // left of $rowStart
+    if (index < rowStart) {
+      let y = 0;
+      let h = 0;
+      for (let i = index; i <= eIndex; i += 1) {
+        const rh = rowHeight(i);
+        if (i < rowStart) y -= rh;
+        h += rh;
+      }
+      return { y, h };
+    }
+    const { y } = rows.get(index);
+    let h = 0;
+    for (let i = index; i <= eIndex; i += 1) {
+      h += rowHeight(i);
+    }
+    return { y, h };
+  }
+
+  col(index, eIndex) {
+    const { cols, colStart, colWidth } = this;
+    if ((eIndex === undefined || index === eIndex) && cols.has(index)) {
+      return cols.get(index);
+    }
+    // top of $colStart
+    if (index < colStart) {
+      let x = 0;
+      let w = 0;
+      for (let i = index; i <= eIndex; i += 1) {
+        const cw = colWidth(i);
+        if (i < colStart) x -= cw;
+        w += cw;
+      }
+      return { x, w };
+    }
+    const { x } = cols.get(index);
+    let w = 0;
+    for (let i = index; i <= eIndex; i += 1) {
+      w += colWidth(i);
+    }
+    return { x, w };
   }
 }
 
 export function newArea(...args) {
-  let nargs = args;
-  if (typeof args[0] === 'string') {
-    const ary = args[0].split(':');
-    if (ary.length === 1) ary.push(ary[0]);
-    const start = expr2xy(ary[0]);
-    const end = expr2xy(ary[1]);
-    // console.log('ary:', ary, start, end);
-    nargs = [start[1], start[0], end[1], end[0]];
-  }
-  return new TableArea(...nargs);
+  return new TableArea(...args);
 }

@@ -1,40 +1,29 @@
 /* global window, document */
 /* eslint func-names: ["error", "never"] */
 import { cellRender } from './cell-render';
-import { stringAt } from './alphabet';
+import { stringAt, expr2xy } from './alphabet';
 import Canvas2d from './canvas2d';
 import { newArea } from './table-area';
+import { newCellRange } from './cell-range';
 
-// draw
-// area: TableArea
-// rows: Function<{y, h}>
-// cols: Function<{x, w}>
-function renderLines(draw, area, rows, cols, { width, color }) {
+function renderLines(draw, area, { width, color }) {
   // render row-col-lines
   if (width > 0) {
     // const [rs, cs, re, ce, aw, ah] = area;
     draw.save().beginPath()
       .attr({ lineWidth: width, strokeStyle: color });
 
-    area.rowEach((ri) => {
-      const { y, h } = rows(ri);
+    area.rowEach((ri, { y, h }) => {
       draw.line([0, y + h], [area.width, y + h]);
     });
 
-    area.colEach((ci) => {
-      const { x, w } = cols(ci);
+    area.colEach((ci, { x, w }) => {
       draw.line([x + w, 0], [x + w, area.height]);
     });
     draw.restore();
   }
 }
 
-// draw: Canvas2d
-// cell: Function<{ text, style }>
-// cellRect: { left, top, width, height }
-// cellStyle
-// hl: highlight
-// hlStyle: highlightStyle
 function renderCell(draw, ri, ci, cell, cellRect, cellStyle, hl, hlStyle) {
   const c = cell(ri, ci);
   let text = '';
@@ -48,58 +37,30 @@ function renderCell(draw, ri, ci, cell, cellRect, cellStyle, hl, hlStyle) {
       }
     }
   }
-  // console.log('text:', text, ', x:', x, ', y:', y, style);
+  // console.log('text:', text, ', rect:', cellRect, style);
   cellRender(draw, text, cellRect, style);
-  if (hl && newArea(hl).includes(ri, ci)) {
-    const {
-      left, top, width, height,
-    } = cellRect;
+  if (hl && newCellRange(hl).includes(ri, ci)) {
     draw.save()
       .attr({ fillStyle: hlStyle.bgcolor })
-      .fillRect(left, top, width, height)
+      .fillRect(cellRect.x, cellRect.y, cellRect.w, cellRect.h)
       .restore();
   }
 }
 
-// draw: Canvas2d
-// area: TableArea
-// rows: Function<{y, h}>
-// cols: Function<{x, w}>
-// cell: Function<{ text, style }>
-// cellStyle: the default cell style
-// hl: highlight
-// hlStyle: highlightStyle
-// merges: ['A1:B2',....]
-function renderCells(draw, area, rows, cols, cell, cellStyle, hl, hlStyle, merges) {
-  draw.save();
+function renderCells(draw, area, cell, cellStyle, hl, hlStyle, merges) {
+  draw.save().rect(0, 0, area.width, area.height).clip();
   // const [rs, cs, re, ce] = area;
-  area.each((ri, ci) => {
-    const { y, h } = rows(ri);
-    const { x, w } = cols(ci);
-    renderCell(draw, ri, ci, cell, {
-      left: x, top: y, width: w, height: h,
-    }, cellStyle, hl, hlStyle);
+  area.each((ri, ci, rect) => {
+    // console.log('ri:', ri, ', ci:', ci, ', rect:', rect);
+    renderCell(draw, ri, ci, cell, rect, cellStyle, hl, hlStyle);
   });
   if (merges && merges.length > 0) {
     merges.forEach((merge) => {
-      const a = newArea(merge);
-      // console.log('merge:', merge, [mrs, mcs, mre, mce], area);
+      const a = newCellRange(merge);
       if (a.intersects(area)) {
-        const {
-          rowStart, colStart, rowEnd, colEnd,
-        } = a;
-        // console.log('rowStart:', rowStart, ', colStart:', colStart);
-        const { x, w } = cols(colStart, colEnd);
-        const { y, h } = rows(rowStart, rowEnd);
-        /*
-        let width = 0;
-        let height = 0;
-        a.rowEach((i) => { height += rows(i).h; });
-        a.colEach((i) => { width += cols(i).w; });
-        */
-        // console.log('x:', x, ', y:', y, ', width:', width, ', height:', height);
-        renderCell(draw, rowStart, colStart, cell, {
-          left: x, top: y, width: w, height: h,
+        renderCell(draw, a.rowStart, a.colStart, cell, {
+          ...area.col(a.colStart, a.colEnd),
+          ...area.row(a.rowStart, a.rowEnd),
         }, cellStyle, hl, hlStyle);
       }
     });
@@ -107,86 +68,230 @@ function renderCells(draw, area, rows, cols, cell, cellStyle, hl, hlStyle, merge
   draw.restore();
 }
 
-function renderContent(draw, area, rows, cols,
+function renderLinesAndCells(draw, area,
   cell, cellStyle, lineStyle, hlArea, hlStyle, merges) {
-  renderLines(draw, area, rows, cols, lineStyle);
-  renderCells(draw, area, rows, cols, cell, cellStyle, hlArea, hlStyle, merges);
+  renderLines(draw, area, lineStyle);
+  renderCells(draw, area, cell, cellStyle, hlArea, hlStyle, merges);
 }
 
+// private methods --- start ----
+function $renderIndexRows(draw, area, ty) {
+  // render row-index
+  if (this.$indexColWidth > 0) {
+    draw.save().translate(0, ty);
+    renderLinesAndCells(draw,
+      newArea(area.rowStart, 0, area.rowEnd, 0, () => this.$indexColWidth, this.$rowHeight),
+      this.$indexRowCell, this.$indexStyle, this.$indexLineStyle,
+      this.$highlight && this.$highlight.replace(/\w+/g, 'A'), this.$highlightStyle);
+    draw.restore();
+  }
+}
+
+function $renderIndexCols(draw, area, tx) {
+  // render col-index
+  if (this.indexRowsHeight > 0) {
+    draw.save().translate(tx, 0);
+    renderLinesAndCells(draw,
+      newArea(0, area.colStart, this.$indexRowsLength - 1, area.colEnd,
+        this.$colWidth, () => this.$indexRowHeight),
+      this.$indexColCell, this.$indexStyle, this.$indexLineStyle,
+      this.$highlight && this.$highlight.replace(/\d+/g, '0'),
+      this.$highlightStyle, this.$indexMerges);
+    draw.restore();
+  }
+}
+
+function $renderBody(draw, area, tx, ty) {
+  draw.save().translate(tx, ty);
+  renderLinesAndCells(draw, area,
+    this.$cell, this.$cellStyle, this.$lineStyle,
+    this.$highlight, this.$highlightStyle, this.$merges);
+  draw.restore();
+}
+
+function $renderFreezeLines(draw, x, y) {
+  const [fc, fr] = expr2xy(this.$freeze);
+  const { width, color } = this.$freezeLineStyle;
+  // console.log('width:', width, color, fr, fc);
+  if (width > 0 && (fr > 0 || fc > 0)) {
+    draw.save().attr({ lineWidth: width, strokeStyle: color });
+    if (fr > 0) draw.line([0, y], [this.$width, y]);
+    if (fc > 0) draw.line([x, 0], [x, this.$height]);
+    draw.restore();
+  }
+}
+
+function $render(draw) {
+  const [area1, area2, area3, area4] = this.viewAreas;
+  const tx = this.$indexColWidth;
+  const ty = this.indexRowsHeight;
+  const { width, height } = area2;
+  draw.resize(this.$width, this.$height);
+
+  // render area-4
+  $renderBody.call(this, draw, area4, tx + width, ty + height);
+
+  // render area-1
+  $renderBody.call(this, draw, area1, tx + width, ty);
+  $renderIndexCols.call(this, draw, area1, tx + width);
+
+  // render area-3
+  $renderBody.call(this, draw, area3, tx, ty + height);
+  $renderIndexRows.call(this, draw, area3, ty + height);
+
+  // render area-2
+  $renderBody.call(this, draw, area2, tx, ty);
+  $renderIndexRows.call(this, draw, area2, ty);
+  $renderIndexCols.call(this, draw, area2, tx);
+
+  // render freeze
+  $renderFreezeLines.call(this, draw, tx + width, ty + height);
+
+  // left-top
+  if (tx > 0 && ty > 0) {
+    renderLinesAndCells(draw,
+      newArea(0, 0, 0, 0, () => tx, () => ty),
+      () => '', this.$indexStyle, this.$indexLineStyle);
+  }
+}
+
+function $newArea(rowStart, colStart, rowEnd, colEnd) {
+  return newArea(rowStart, colStart, rowEnd, colEnd,
+    this.$colWidth, this.$rowHeight);
+}
+// --- end ---
+
 class TableRender {
+  $drawMap = new Map();
+
+  $rowsLength = 100;
+
+  $colsLength = 26;
+
+  $rowStart = 0;
+
+  $colStart = 0;
+
+  $rowHeight = () => 25;
+
+  $colWidth = () => 100;
+
+  // line-style
+  $lineStyle = {
+    width: 1,
+    color: '#e6e6e6',
+  };
+
+  // scroll
+  $scrollRow = 0;
+
+  $scrollCol = 0;
+
+  // freeze: A1
+  $freeze = 'A1';
+
+  $freezeLineStyle = {
+    width: 2,
+    color: '#d8d8d8',
+  };
+
+  // index...
+  $indexRowHeight = 25;
+
+  $indexRowsLength = 1;
+
+  $indexRowCell = (r) => r + 1;
+
+  $indexColWidth = 60;
+
+  $indexColCell = (r, c) => stringAt(c);
+
+  $indexMerges = [];
+
+  $indexLineStyle = {
+    width: 1,
+    color: '#e6e6e6',
+  };
+
+  // index-style
+  $indexStyle = {
+    bgcolor: '#f4f5f8',
+    align: 'center',
+    valign: 'middle',
+    fontSize: 9,
+    fontFamily: 'Source Sans Pro',
+    color: '#585757',
+  };
+
+  // highlight-area
+  // ref: 'A1' || 'A1:B1'
+  $highlight = undefined;
+
+  $highlightStyle = {
+    color: '#4b89ff',
+    bgcolor: '#4b89ff14',
+  };
+
+  // cell
+  $cellStyle = {
+    bgcolor: '#ffffff',
+    align: 'left',
+    valign: 'middle',
+    textwrap: true,
+    underline: false,
+    color: '#0a0a0a',
+    bold: false,
+    italic: false,
+    fontSize: 9,
+    fontFamily: 'Source Sans Pro',
+  };
+
+  $cell = () => '';
+
+  $merges = [];
+
   constructor(width, height) {
-    this.$drawMap = new Map();
     this.$width = width;
     this.$height = height;
-    this.$rowsLength = 100;
-    this.$colsLength = 26;
-    this.$rowStart = 0;
-    this.$colStart = 0;
-    this.$rowHeight = () => 25;
-    this.$colWidth = () => 100;
-
-    // line-style
-    this.$lineStyle = {
-      width: 1,
-      color: '#e6e6e6',
-    };
-
-    // freeze: A1
-    this.$freeze = 'A1';
-    this.$freezeLineStyle = {
-      width: 1,
-      color: '#4b89ff',
-    };
-
-    // index...
-    this.$indexRowHeight = 25;
-    this.$indexRowsLength = 1;
-    this.$indexRowCell = (r) => r + 1;
-    this.$indexColWidth = 60;
-    this.$indexColCell = (r, c) => stringAt(c);
-    this.$indexMerges = [];
-    this.$indexLineStyle = {
-      width: 1,
-      color: '#e6e6e6',
-    };
-    // index-style
-    this.$indexStyle = {
-      bgcolor: '#f4f5f8',
-      align: 'center',
-      valign: 'middle',
-      fontSize: 9,
-      fontFamily: 'Source Sans Pro',
-      color: '#585757',
-    };
-
-    // highlight-area
-    // ref: 'A1' || 'A1:B1'
-    this.$highlight = undefined;
-    this.$highlightStyle = {
-      color: '#4b89ff',
-      bgcolor: '#4b89ff14',
-    };
-
-    // cell
-    this.$cellStyle = {
-      bgcolor: '#ffffff',
-      align: 'left',
-      valign: 'middle',
-      textwrap: true,
-      underline: false,
-      color: '#0a0a0a',
-      bold: false,
-      italic: false,
-      fontSize: 9,
-      fontFamily: 'Source Sans Pro',
-    };
-    this.$cell = () => '';
-    // ['A1:B2',...]
-    this.$merges = [];
   }
 
   get indexRowsHeight() {
     return this.$indexRowHeight * this.$indexRowsLength;
+  }
+
+  //                |
+  //    2(top-left) | 1(top-right)
+  // ------------------------------------
+  // 3(bottom-left) | 4(bottom-right)
+  //                |
+  get viewAreas() {
+    const {
+      $rowStart, $colStart, $width, $height,
+    } = this;
+    const [fc, fr] = expr2xy(this.$freeze);
+    // console.log('fc:', fc, ', fr:', fr);
+    const area2 = $newArea.call(this, $rowStart, $colStart, fr - 1, fc - 1);
+    const rowStart4 = fr + this.$scrollRow;
+    const colStart4 = fc + this.$scrollCol;
+    let rowEnd = rowStart4;
+    let totalHeight = area2.height;
+    while (totalHeight < $height && rowEnd < this.$rowsLength) {
+      const h = this.$rowHeight(rowEnd);
+      totalHeight += h;
+      rowEnd += 1;
+    }
+    let colEnd = colStart4;
+    let totalWidth = area2.width;
+    while (totalWidth < $width && colEnd < this.$colsLength) {
+      const w = this.$colWidth(colEnd);
+      totalWidth += w;
+      colEnd += 1;
+    }
+    const area4 = $newArea.call(this, rowStart4, colStart4, rowEnd, colEnd);
+    const area1 = $newArea.call(this, $rowStart, colStart4, fr - 1, colEnd);
+    const area3 = $newArea.call(this, rowStart4, $colStart, rowEnd, fc - 1);
+    // console.log('area1:', area1, ', area2:', area2, ', area3:', area3, ', area4:', area4);
+    return [area1, area2, area3, area4];
   }
 
   to(cssSelector) {
@@ -196,127 +301,23 @@ class TableRender {
       $drawMap.set(cssSelector, Canvas2d.create(el));
     }
     const draw = $drawMap.get(cssSelector);
+    $render.call(this, draw);
+  }
 
-    const {
-      $width, $height, $rowStart, $colStart,
-      $indexStyle, $lineStyle, $indexColWidth,
-      $highlight, $highlightStyle,
-      $indexRowHeight, $indexRowsLength, indexRowsHeight,
-      $merges, $indexMerges, $indexLineStyle,
-      $rowsLength, $colsLength,
-    } = this;
-    draw.resize($width, $height);
-
-    let totalh = 0;
-    let rowEnd = $rowStart;
-    const rows = new Map();
-    while (totalh < $height && rowEnd < $rowsLength) {
-      const h = this.$rowHeight(rowEnd);
-      rows.set(rowEnd, { y: totalh, h });
-      totalh += h;
-      rowEnd += 1;
+  freeze(ref) {
+    if (ref !== 'A1') {
+      this.$rowStart = this.$scrollRow;
+      this.$colStart = this.$scrollCol;
+      this.$scrollRow = 0;
+      this.$scrollCol = 0;
+    } else {
+      this.$scrollRow = this.$rowStart;
+      this.$scrollCol = this.$colStart;
+      this.$rowStart = 0;
+      this.$colStart = 0;
     }
-    rows.set(rowEnd, { y: totalh, h: this.$rowHeight(rowEnd) });
-
-    let totalw = 0;
-    let colEnd = $colStart;
-    const cols = new Map();
-    while (totalw < $width && $colStart < $colsLength) {
-      const w = this.$colWidth(colEnd);
-      cols.set(colEnd, { x: totalw, w });
-      totalw += w;
-      colEnd += 1;
-    }
-    cols.set(colEnd, { x: totalw, w: this.$colWidth(colEnd) });
-
-    const rowFunc = (index, eIndex) => {
-      if ((eIndex === undefined || index === eIndex) && rows.has(index)) {
-        return rows.get(index);
-      }
-      // left of $rowStart
-      if (index < $rowStart) {
-        let y = 0;
-        let h = 0;
-        for (let i = index; i <= eIndex; i += 1) {
-          const rh = this.$rowHeight(i);
-          if (i < $rowStart) y -= rh;
-          h += rh;
-        }
-        return { y, h };
-      }
-      const { y } = rows.get(index);
-      let h = 0;
-      for (let i = index; i <= eIndex; i += 1) {
-        h += this.$rowHeight(i);
-      }
-      return { y, h };
-    };
-    const colFunc = (index, eIndex) => {
-      if ((eIndex === undefined || index === eIndex) && cols.has(index)) {
-        return cols.get(index);
-      }
-      // top of $colStart
-      if (index < $colStart) {
-        let x = 0;
-        let w = 0;
-        for (let i = index; i <= eIndex; i += 1) {
-          const cw = this.$colWidth(i);
-          if (i < $colStart) x -= cw;
-          w += cw;
-        }
-        return { x, w };
-      }
-      const { x } = cols.get(index);
-      let w = 0;
-      for (let i = index; i <= eIndex; i += 1) {
-        w += this.$colWidth(i);
-      }
-      return { x, w };
-    };
-
-    const viewArea = newArea($rowStart, $colStart, rowEnd, colEnd, $width, $height);
-
-    // render content
-    draw.save().translate($indexColWidth, indexRowsHeight);
-    renderContent(draw, viewArea, rowFunc, colFunc,
-      this.$cell, this.$cellStyle, $lineStyle,
-      $highlight, $highlightStyle, $merges);
-    draw.restore();
-
-    // render row-index
-    if ($indexColWidth > 0) {
-      draw.save().translate(0, indexRowsHeight);
-      renderContent(draw,
-        newArea($rowStart, 0, rowEnd, 0, $indexColWidth, $height),
-        rowFunc,
-        () => ({ x: 0, w: $indexColWidth }),
-        this.$indexRowCell, $indexStyle, $indexLineStyle,
-        $highlight && $highlight.replace(/\w+/g, 'A'), $highlightStyle);
-      draw.restore();
-    }
-    // render col-index
-    if (indexRowsHeight > 0) {
-      draw.save().translate($indexColWidth, 0);
-      renderContent(draw,
-        newArea(0, $colStart, $indexRowsLength - 1, colEnd, $width, indexRowsHeight),
-        (i, ei) => ({
-          y: i * $indexRowHeight,
-          h: ((ei || i) - i + 1) * $indexRowHeight,
-        }),
-        colFunc,
-        this.$indexColCell, $indexStyle, $indexLineStyle,
-        $highlight && $highlight.replace(/\d+/g, '0'), $highlightStyle, $indexMerges);
-      draw.restore();
-    }
-
-    // top-left
-    if ($indexColWidth > 0 && indexRowsHeight > 0) {
-      renderContent(draw,
-        newArea(0, 0, 0, 0, $indexColWidth, indexRowsHeight),
-        () => ({ y: 0, h: indexRowsHeight }),
-        () => ({ x: 0, w: $indexColWidth }),
-        () => '', $indexStyle, $indexLineStyle);
-    }
+    this.$freeze = ref;
+    return this;
   }
 
   static create(width, height) {
@@ -327,10 +328,10 @@ class TableRender {
 // single property
 [
   'width', 'height', 'rowsLength', 'colsLength',
-  'rowHeight', 'colWidth', 'rowStart', 'colStart',
+  'rowHeight', 'colWidth', 'scrollRow', 'scrollCol',
   'indexRowHeight', 'indexRowsLength', 'indexColWidth', 'indexColText',
   'cell', 'indexColCell', 'indexRowCell', 'highlight',
-  'merges', 'indexMerges', 'freeze',
+  'merges', 'indexMerges',
 ].forEach((it) => {
   TableRender.prototype[it] = function (arg) {
     this[`$${it}`] = arg;

@@ -89,24 +89,22 @@ function fontString(family, size, italic, bold) {
 
 // draw: Canvas2d
 // style:
-export function cellRender(draw, text, {
-  left, top, width, height,
-}, {
+export function cellRender(draw, text, rect, {
   border, fontSize, fontFamily,
   bold, italic, color, bgcolor,
   align, valign, underline, strike,
   textwrap, padding,
-}) {
+} = {}) {
   // at first move to (left, top)
   draw.save().beginPath()
-    .translate(left, top);
+    .translate(rect.x, rect.y);
 
   // border
-  renderBorder(draw, width, height, border);
+  renderBorder(draw, rect.w, rect.h, border);
 
   // clip
   draw.attr({ fillStyle: bgcolor })
-    .rect(0.5, 0.5, width - 1, height - 1)
+    .rect(0.5, 0.5, rect.w - 1, rect.h - 1)
     .clip()
     .fill();
 
@@ -119,9 +117,9 @@ export function cellRender(draw, text, {
   });
 
   const [xp, yp] = padding || [5, 5];
-  const tx = textx(align, width, xp);
+  const tx = textx(align, rect.w, xp);
   const txts = text.split('\n');
-  const innerWidth = width - (xp * 2);
+  const innerWidth = rect.w - (xp * 2);
   const ntxts = [];
   txts.forEach((it) => {
     const txtWidth = draw.textWidth(it);
@@ -148,7 +146,7 @@ export function cellRender(draw, text, {
   const lineTypes = [];
   if (underline) lineTypes.push('underline');
   if (strike) lineTypes.push('strike');
-  let ty = texty(valign, height, txtHeight, yp);
+  let ty = texty(valign, rect.h, txtHeight, yp);
   ntxts.forEach((it) => {
     const txtWidth = draw.textWidth(it);
     draw.fillText(it, tx, ty);
