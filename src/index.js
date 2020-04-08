@@ -24,7 +24,9 @@ function renderLines(draw, area, { width, color }) {
   }
 }
 
-function renderCell(draw, ri, ci, cell, cellRect, cellStyle, hl, hlStyle) {
+// select: CellRange
+// type: index-rows | index-cols | content
+function renderCell(draw, ri, ci, cell, cellRect, cellStyle) {
   const c = cell(ri, ci);
   let text = '';
   let style = cellStyle;
@@ -39,39 +41,52 @@ function renderCell(draw, ri, ci, cell, cellRect, cellStyle, hl, hlStyle) {
   }
   // console.log('text:', text, ', rect:', cellRect, style);
   cellRender(draw, text, cellRect, style);
-  if (hl && newCellRange(hl).includes(ri, ci)) {
-    draw.save()
-      .attr({ fillStyle: hlStyle.bgcolor })
-      .fillRect(cellRect.x, cellRect.y, cellRect.w, cellRect.h)
-      .restore();
-  }
 }
 
-function renderCells(draw, area, cell, cellStyle, hl, hlStyle, merges) {
+// type: index-rows | index-cols | content
+function renderCells(draw, type, area, cell, cellStyle, select, selectStyle, merges) {
   draw.save().rect(0, 0, area.width, area.height).clip();
   // const [rs, cs, re, ce] = area;
   area.each((ri, ci, rect) => {
     // console.log('ri:', ri, ', ci:', ci, ', rect:', rect);
-    renderCell(draw, ri, ci, cell, rect, cellStyle, hl, hlStyle);
+    renderCell(draw, ri, ci, cell, rect, cellStyle);
   });
+
+  // render merges
   if (merges && merges.length > 0) {
     merges.forEach((merge) => {
       const a = newCellRange(merge);
       if (a.intersects(area)) {
-        renderCell(draw, a.rowStart, a.colStart, cell, {
-          ...area.col(a.colStart, a.colEnd),
-          ...area.row(a.rowStart, a.rowEnd),
-        }, cellStyle, hl, hlStyle);
+        renderCell(draw, a.rowStart, a.colStart,
+          cell, area.rect(a), cellStyle);
       }
     });
+  }
+
+  // render select
+  if (select && area.intersects(select)) {
+    const {
+      x, y, w, h,
+    } = area.rect(select);
+    const { bgcolor } = selectStyle;
+    draw.save()
+      .attr({ fillStyle: bgcolor })
+      .rect(x, y, w, h)
+      .fill()
+      .restore();
   }
   draw.restore();
 }
 
-function renderLinesAndCells(draw, area,
-  cell, cellStyle, lineStyle, hlArea, hlStyle, merges) {
+// type: index | content
+// cell: Function
+// cellStyle: cell-style
+// select: CellRange
+function renderLinesAndCells(draw, type, area,
+  cell, cellStyle, lineStyle, select, selectStyle, merges) {
   renderLines(draw, area, lineStyle);
-  renderCells(draw, area, cell, cellStyle, hlArea, hlStyle, merges);
+  renderCells(draw, type, area, cell, cellStyle,
+    select, selectStyle, merges);
 }
 
 // private methods --- start ----
@@ -79,10 +94,13 @@ function $renderIndexRows(draw, area, ty) {
   // render row-index
   if (this.$indexColWidth > 0) {
     draw.save().translate(0, ty);
-    renderLinesAndCells(draw,
+    const nselect = this.$select.clone();
+    nselect.colStart = 0;
+    nselect.colEnd = 0;
+    renderLinesAndCells(draw, 'index-rows',
       newArea(area.rowStart, 0, area.rowEnd, 0, () => this.$indexColWidth, this.$rowHeight),
       this.$indexRowCell, this.$indexStyle, this.$indexLineStyle,
-      this.$highlight && this.$highlight.replace(/\w+/g, 'A'), this.$highlightStyle);
+      nselect, this.$selectStyle);
     draw.restore();
   }
 }
@@ -91,21 +109,23 @@ function $renderIndexCols(draw, area, tx) {
   // render col-index
   if (this.indexRowsHeight > 0) {
     draw.save().translate(tx, 0);
-    renderLinesAndCells(draw,
-      newArea(0, area.colStart, this.$indexRowsLength - 1, area.colEnd,
+    const nselect = this.$select.clone();
+    nselect.rowStart = 0;
+    nselect.rowEnd = this.$indexRowsLength - 1;
+    renderLinesAndCells(draw, 'index-cols',
+      newArea(0, area.colStart, nselect.rowEnd, area.colEnd,
         this.$colWidth, () => this.$indexRowHeight),
       this.$indexColCell, this.$indexStyle, this.$indexLineStyle,
-      this.$highlight && this.$highlight.replace(/\d+/g, '0'),
-      this.$highlightStyle, this.$indexMerges);
+      nselect, this.$selectStyle, this.$indexMerges);
     draw.restore();
   }
 }
 
 function $renderBody(draw, area, tx, ty) {
   draw.save().translate(tx, ty);
-  renderLinesAndCells(draw, area,
+  renderLinesAndCells(draw, 'content', area,
     this.$cell, this.$cellStyle, this.$lineStyle,
-    this.$highlight, this.$highlightStyle, this.$merges);
+    this.$select, this.$selectStyle, this.$merges);
   draw.restore();
 }
 
@@ -149,7 +169,7 @@ function $render(draw) {
 
   // left-top
   if (tx > 0 && ty > 0) {
-    renderLinesAndCells(draw,
+    renderLinesAndCells(draw, 'index',
       newArea(0, 0, 0, 0, () => tx, () => ty),
       () => '', this.$indexStyle, this.$indexLineStyle);
   }
@@ -223,12 +243,13 @@ class TableRender {
     color: '#585757',
   };
 
-  // highlight-area
-  // ref: 'A1' || 'A1:B1'
-  $highlight = undefined;
+  // select-area
+  // 'A1:B1'
+  $select = undefined;
 
-  $highlightStyle = {
-    color: '#4b89ff',
+  $selectStyle = {
+    borderWidth: 1,
+    borderColor: '#ffffff',
     bgcolor: '#4b89ff14',
   };
 
@@ -294,14 +315,24 @@ class TableRender {
     return [area1, area2, area3, area4];
   }
 
-  to(cssSelector) {
+  // target: cssSelector | element
+  to(target) {
     const { $drawMap } = this;
-    if (!$drawMap.has(cssSelector)) {
-      const el = document.querySelector(cssSelector);
-      $drawMap.set(cssSelector, Canvas2d.create(el));
+    let el = target;
+    if (typeof target === 'string') {
+      el = document.querySelector(target);
     }
-    const draw = $drawMap.get(cssSelector);
+    if (!$drawMap.has(el)) {
+      $drawMap.set(el, Canvas2d.create(el));
+    }
+    const draw = $drawMap.get(el);
     $render.call(this, draw);
+    return this;
+  }
+
+  select(ref) {
+    this.$select = newCellRange(ref);
+    return this;
   }
 
   freeze(ref) {
@@ -330,7 +361,7 @@ class TableRender {
   'width', 'height', 'rowsLength', 'colsLength',
   'rowHeight', 'colWidth', 'scrollRow', 'scrollCol',
   'indexRowHeight', 'indexRowsLength', 'indexColWidth', 'indexColText',
-  'cell', 'indexColCell', 'indexRowCell', 'highlight',
+  'cell', 'indexColCell', 'indexRowCell',
   'merges', 'indexMerges',
 ].forEach((it) => {
   TableRender.prototype[it] = function (arg) {
@@ -342,7 +373,7 @@ class TableRender {
 // object property
 [
   'lineStyle', 'cellStyle', 'indexStyle', 'indexLineStyle',
-  'highlightStyle', 'freezeLineStyle',
+  'selectStyle', 'freezeLineStyle',
 ].forEach((it) => {
   TableRender.prototype[it] = function (arg) {
     Object.assign(this[`$${it}`], arg || {});

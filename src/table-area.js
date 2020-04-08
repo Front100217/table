@@ -90,6 +90,14 @@ export default class TableArea extends CellRange {
     }
     return { x, w };
   }
+
+  // cr: CellRange
+  rect(cr) {
+    return {
+      ...this.col(cr.colStart, cr.colEnd),
+      ...this.row(cr.rowStart, cr.rowEnd),
+    };
+  }
 }
 
 export function newArea(...args) {

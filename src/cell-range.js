@@ -45,6 +45,15 @@ export default class CellRange {
     });
   }
 
+  clone() {
+    return new CellRange(
+      this.rowStart,
+      this.colStart,
+      this.rowEnd,
+      this.colEnd,
+    );
+  }
+
   intersects(other) {
     return this.rowStart <= other.rowEnd
       && this.colStart <= other.colEnd
@@ -54,6 +63,7 @@ export default class CellRange {
 }
 
 export function newCellRange(ref) {
+  if (ref === undefined) return undefined;
   const ary = ref.split(':');
   const start = expr2xy(ary[0]);
   const end = expr2xy(ary[1]);
