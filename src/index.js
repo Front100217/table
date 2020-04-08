@@ -68,12 +68,20 @@ function renderCells(draw, type, area, cell, cellStyle, select, selectStyle, mer
     const {
       x, y, w, h,
     } = area.rect(select);
-    const { bgcolor } = selectStyle;
+    const { bgcolor, borderWidth, borderColor } = selectStyle;
+    const bw = type === 'content' ? borderWidth : 0;
+    const bw2 = bw * 2;
     draw.save()
       .attr({ fillStyle: bgcolor })
-      .rect(x, y, w, h)
-      .fill()
-      .restore();
+      .rect(x + bw, y + bw, w - bw2, h - bw2)
+      .fill();
+    if (type === 'content') {
+      draw.attr({
+        strokeStyle: borderColor,
+        lineWidth: borderWidth,
+      }).stroke();
+    }
+    draw.restore();
   }
   draw.restore();
 }
@@ -248,8 +256,8 @@ class TableRender {
   $select = undefined;
 
   $selectStyle = {
-    borderWidth: 1,
-    borderColor: '#ffffff',
+    borderWidth: 2,
+    borderColor: '#4b89ff',
     bgcolor: '#4b89ff14',
   };
 

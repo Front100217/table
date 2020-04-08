@@ -5,7 +5,7 @@ function dpr() {
 }
 
 function npx(px) {
-  return Math.round(px * dpr());
+  return px * dpr();
 }
 
 function attrRadio(ctx, key, v, cb) {
@@ -113,6 +113,15 @@ export default class Canvas2d {
     return this;
   }
 
+  strokeRect(x, y, width, height) {
+    const { ctx } = this;
+    attrRadio(ctx,
+      'lineWidth',
+      (it) => npx(it),
+      () => (ctx.strokeRect(npx(x), npx(y), width, height)));
+    return this;
+  }
+
   static create(el) {
     return new Canvas2d(el);
   }
@@ -137,17 +146,27 @@ export default class Canvas2d {
   };
 });
 
-[
-  'fillRect', 'clearRect', 'strokeRect', 'moveTo', 'lineTo', 'arcTo',
-  'bezierCurveTo', 'isPointinPath', 'isPointinStroke', 'quadraticCurveTo',
-  'rect', 'translate', 'createRadialGradient', 'createLinearGradient',
-].forEach((it) => {
+// arcTo: 4
+Object.entries({
+  translate: 2,
+  rect: 2,
+  fillRect: 2,
+  clearRect: 2,
+  moveTo: 2,
+  lineTo: 2,
+  arc: 2,
+  arcTo: 4,
+  bezierCurveTo: 6,
+  quadraticCurveTo: 4,
+  createRadialGradient: 6,
+  createLinearGradient: 4,
+}).forEach(([it, cnt]) => {
   Canvas2d.prototype[it] = function (...args) {
     const { ctx } = this;
-    const even = npx(ctx.lineWidth) % 2 === 0 || it === 'translate';
-    ctx[it](...args.map((arg) => {
+    const even = npx(ctx.lineWidth) % 2 === 0;
+    ctx[it](...args.map((arg, index) => {
       let n = npx(arg);
-      if (!even) n -= 0.5;
+      if (!even && index < cnt) n -= 0.5;
       return n;
     }));
     return this;

@@ -32,7 +32,7 @@ export function expr2xy(src) {
     if (src.charAt(i) >= '0' && src.charAt(i) <= '9') {
       y += src.charAt(i);
     } else {
-      x += src.charAt(i);
+      x += src.charAt(i).toUpperCase();
     }
   }
   return [indexAt(x), parseInt(y, 10) - 1];
