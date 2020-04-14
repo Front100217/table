@@ -106,7 +106,7 @@ function $renderIndexRows(draw, area, ty) {
     nselect.colStart = 0;
     nselect.colEnd = 0;
     renderLinesAndCells(draw, 'index-rows',
-      newArea(area.rowStart, 0, area.rowEnd, 0, () => this.$indexColWidth, this.$rowHeight),
+      newArea(area.rowStart, 0, area.rowEnd, 0, () => ({ width: this.$indexColWidth }), this.$row),
       this.$indexRowCell, this.$indexStyle, this.$indexLineStyle,
       nselect, this.$selectStyle);
     draw.restore();
@@ -122,7 +122,7 @@ function $renderIndexCols(draw, area, tx) {
     nselect.rowEnd = this.$indexRowsLength - 1;
     renderLinesAndCells(draw, 'index-cols',
       newArea(0, area.colStart, nselect.rowEnd, area.colEnd,
-        this.$colWidth, () => this.$indexRowHeight),
+        this.$col, () => ({ height: this.$indexRowHeight })),
       this.$indexColCell, this.$indexStyle, this.$indexLineStyle,
       nselect, this.$selectStyle, this.$indexMerges);
     draw.restore();
@@ -178,18 +178,18 @@ function $render(draw) {
   // left-top
   if (tx > 0 && ty > 0) {
     renderLinesAndCells(draw, 'index',
-      newArea(0, 0, 0, 0, () => tx, () => ty),
+      newArea(0, 0, 0, 0, () => ({ width: tx }), () => ({ height: ty })),
       () => '', this.$indexStyle, this.$indexLineStyle);
   }
 }
 
 function $newArea(rowStart, colStart, rowEnd, colEnd) {
   return newArea(rowStart, colStart, rowEnd, colEnd,
-    this.$colWidth, this.$rowHeight);
+    this.$col, this.$row);
 }
 // --- end ---
 
-class TableRender {
+class Table {
   $drawMap = new Map();
 
   $rowsLength = 100;
@@ -200,9 +200,9 @@ class TableRender {
 
   $colStart = 0;
 
-  $rowHeight = () => 25;
+  $row = () => ({ height: 25, hide: false });
 
-  $colWidth = () => 100;
+  $col = () => ({ width: 100, hide: false });
 
   // line-style
   $lineStyle = {
@@ -305,16 +305,20 @@ class TableRender {
     let rowEnd = rowStart4;
     let totalHeight = area2.height;
     while (totalHeight < $height && rowEnd < this.$rowsLength) {
-      const h = this.$rowHeight(rowEnd);
-      totalHeight += h;
-      rowEnd += 1;
+      const { height, hide } = this.$row(rowEnd);
+      if (hide !== true) {
+        totalHeight += height;
+        rowEnd += 1;
+      }
     }
     let colEnd = colStart4;
     let totalWidth = area2.width;
     while (totalWidth < $width && colEnd < this.$colsLength) {
-      const w = this.$colWidth(colEnd);
-      totalWidth += w;
-      colEnd += 1;
+      const { width, hide } = this.$col(colEnd);
+      if (hide !== true) {
+        totalWidth += width;
+        colEnd += 1;
+      }
     }
     const area4 = $newArea.call(this, rowStart4, colStart4, rowEnd, colEnd);
     const area1 = $newArea.call(this, $rowStart, colStart4, fr - 1, colEnd);
@@ -360,19 +364,19 @@ class TableRender {
   }
 
   static create(width, height) {
-    return new TableRender(width, height);
+    return new Table(width, height);
   }
 }
 
 // single property
 [
   'width', 'height', 'rowsLength', 'colsLength',
-  'rowHeight', 'colWidth', 'scrollRow', 'scrollCol',
+  'scrollRow', 'scrollCol',
   'indexRowHeight', 'indexRowsLength', 'indexColWidth', 'indexColText',
   'cell', 'indexColCell', 'indexRowCell',
   'merges', 'indexMerges',
 ].forEach((it) => {
-  TableRender.prototype[it] = function (arg) {
+  Table.prototype[it] = function (arg) {
     this[`$${it}`] = arg;
     return this;
   };
@@ -381,14 +385,14 @@ class TableRender {
 // object property
 [
   'lineStyle', 'cellStyle', 'indexStyle', 'indexLineStyle',
-  'selectStyle', 'freezeLineStyle',
+  'selectStyle', 'freezeLineStyle', 'row', 'col',
 ].forEach((it) => {
-  TableRender.prototype[it] = function (arg) {
+  Table.prototype[it] = function (arg) {
     Object.assign(this[`$${it}`], arg || {});
     return this;
   };
 });
 
-export default TableRender;
+export default Table;
 
-window.WolfTableRender = TableRender;
+window.WolfTable = Table;

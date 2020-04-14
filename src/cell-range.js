@@ -2,25 +2,57 @@ import { expr2xy } from './alphabet';
 
 export default class CellRange {
   constructor(rowStart, colStart, rowEnd, colEnd) {
-    this.rowStart = rowStart;
-    this.colStart = colStart;
-    this.rowEnd = rowEnd;
-    this.colEnd = colEnd;
+    this.$rowStart = rowStart;
+    this.$colStart = colStart;
+    this.$rowEnd = rowEnd;
+    this.$colEnd = colEnd;
+  }
+
+  get rowStart() {
+    return this.$rowStart;
+  }
+
+  get rowEnd() {
+    return this.$rowEnd;
+  }
+
+  get colStart() {
+    return this.$colStart;
+  }
+
+  get colEnd() {
+    return this.$colEnd;
+  }
+
+  set rowStart(v) {
+    this.$rowStart = v;
+  }
+
+  set rowEnd(v) {
+    this.$rowEnd = v;
+  }
+
+  set colStart(v) {
+    this.$colStart = v;
+  }
+
+  set colEnd(v) {
+    this.$colEnd = v;
   }
 
   get length() {
     return [
-      this.rowEnd - this.rowStart,
-      this.colEnd - this.colStart,
+      this.$rowEnd - this.$rowStart,
+      this.$colEnd - this.$colStart,
     ];
   }
 
   inRow(index) {
-    return this.rowStart <= index && index <= this.rowEnd;
+    return this.$rowStart <= index && index <= this.$rowEnd;
   }
 
   inCol(index) {
-    return this.colStart <= index && index <= this.colEnd;
+    return this.$colStart <= index && index <= this.$colEnd;
   }
 
   includes(ri, ci) {
@@ -28,13 +60,13 @@ export default class CellRange {
   }
 
   rowEach(cb) {
-    for (let ri = this.rowStart; ri <= this.rowEnd; ri += 1) {
+    for (let ri = this.$rowStart; ri <= this.$rowEnd; ri += 1) {
       cb(ri);
     }
   }
 
   colEach(cb) {
-    for (let ci = this.colStart; ci <= this.colEnd; ci += 1) {
+    for (let ci = this.$colStart; ci <= this.$colEnd; ci += 1) {
       cb(ci);
     }
   }
@@ -47,18 +79,18 @@ export default class CellRange {
 
   clone() {
     return new CellRange(
-      this.rowStart,
-      this.colStart,
-      this.rowEnd,
-      this.colEnd,
+      this.$rowStart,
+      this.$colStart,
+      this.$rowEnd,
+      this.$colEnd,
     );
   }
 
   intersects(other) {
-    return this.rowStart <= other.rowEnd
-      && this.colStart <= other.colEnd
-      && other.rowStart <= this.rowEnd
-      && other.colStart <= this.colEnd;
+    return this.$rowStart <= other.$rowEnd
+      && this.$colStart <= other.$colEnd
+      && other.$rowStart <= this.$rowEnd
+      && other.$colStart <= this.$colEnd;
   }
 }
 
