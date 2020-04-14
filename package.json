@@ -1,7 +1,7 @@
 {
   "name": "table-render",
   "version": "1.0.0",
-  "description": "a web-based table-render with canvas",
+  "description": "a web-based table with canvas",
   "main": "src/index.js",
   "dependencies": {},
   "devDependencies": {
@@ -32,7 +32,6 @@
   "keywords": [
     "javascript",
     "table",
-    "table-render",
     "canvas",
     "html5"
   ],
@@ -40,6 +39,6 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/wolf.js/table-render.git"
+    "url": "https://github.com/wolf.js/table.git"
   }
 }
