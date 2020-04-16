@@ -100,11 +100,11 @@ export function cellRender(draw, text, rect, {
     .translate(rect.x, rect.y);
 
   // border
-  renderBorder(draw, rect.w, rect.h, border);
+  renderBorder(draw, rect.width, rect.height, border);
 
   // clip
   draw.attr({ fillStyle: bgcolor })
-    .rect(0.5, 0.5, rect.w - 1, rect.h - 1)
+    .rect(0.5, 0.5, rect.width - 1, rect.height - 1)
     .clip()
     .fill();
 
@@ -117,9 +117,9 @@ export function cellRender(draw, text, rect, {
   });
 
   const [xp, yp] = padding || [5, 5];
-  const tx = textx(align, rect.w, xp);
+  const tx = textx(align, rect.width, xp);
   const txts = text.split('\n');
-  const innerWidth = rect.w - (xp * 2);
+  const innerWidth = rect.width - (xp * 2);
   const ntxts = [];
   txts.forEach((it) => {
     const txtWidth = draw.textWidth(it);
@@ -146,7 +146,7 @@ export function cellRender(draw, text, rect, {
   const lineTypes = [];
   if (underline) lineTypes.push('underline');
   if (strike) lineTypes.push('strike');
-  let ty = texty(valign, rect.h, txtHeight, yp);
+  let ty = texty(valign, rect.height, txtHeight, yp);
   ntxts.forEach((it) => {
     const txtWidth = draw.textWidth(it);
     draw.fillText(it, tx, ty);

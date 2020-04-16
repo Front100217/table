@@ -8,22 +8,32 @@ function rangeEach(min, max, getv, cb) {
 }
 
 export default class TableArea extends CellRange {
-  constructor(rowStart, colStart, rowEnd, colEnd, col, row) {
+  constructor(rowStart, colStart, rowEnd, colEnd, col, row, x = 0, y = 0) {
     super(rowStart, colStart, rowEnd, colEnd);
     this.$col = col;
     this.$row = row;
+    this.$x = x;
+    this.$y = y;
     this.$width = 0;
     this.$height = 0;
     this.$rows = new Map();
     this.$cols = new Map();
     rangeEach(rowStart, rowEnd, (i) => row(i), (i, { height }) => {
-      this.$rows.set(i, { y: this.$height, h: height });
+      this.$rows.set(i, { y: this.$height, height });
       this.$height += height;
     });
     rangeEach(colStart, colEnd, (i) => col(i), (i, { width }) => {
-      this.$cols.set(i, { x: this.$width, w: width });
+      this.$cols.set(i, { x: this.$width, width });
       this.$width += width;
     });
+  }
+
+  get x() {
+    return this.$x;
+  }
+
+  get y() {
+    return this.$y;
   }
 
   get width() {
@@ -45,10 +55,10 @@ export default class TableArea extends CellRange {
   }
 
   each(cb) {
-    this.rowEach((ri, { y, h }) => {
-      this.colEach((ci, { x, w }) => {
+    this.rowEach((ri, { y, height }) => {
+      this.colEach((ci, { x, width }) => {
         cb(ri, ci, {
-          x, y, w, h,
+          x, y, width, height,
         });
       });
     });
@@ -62,19 +72,19 @@ export default class TableArea extends CellRange {
     // left of $rowStart
     if (index < $rowStart) {
       let y = 0;
-      let h = 0;
-      rangeEach(index, eIndex, (i) => $row(i), (i, { height }) => {
-        if (i < $rowStart) y -= height;
-        h += height;
+      let height = 0;
+      rangeEach(index, eIndex, (i) => $row(i), (i, v) => {
+        if (i < $rowStart) y -= v.height;
+        height += v.height;
       });
-      return { y, h };
+      return { y, height };
     }
     const { y } = $rows.get(index);
-    let h = 0;
-    rangeEach(index, eIndex, (i) => $row(i), (i, { height }) => {
-      h += height;
+    let height = 0;
+    rangeEach(index, eIndex, (i) => $row(i), (i, v) => {
+      height += v.height;
     });
-    return { y, h };
+    return { y, height };
   }
 
   col(index, eIndex) {
@@ -85,20 +95,24 @@ export default class TableArea extends CellRange {
     // top of $colStart
     if (index < $colStart) {
       let x = 0;
-      let w = 0;
-      rangeEach(index, eIndex, (i) => $col(i), (i, { width }) => {
-        if (i < $colStart) x -= width;
-        w += width;
+      let width = 0;
+      rangeEach(index, eIndex, (i) => $col(i), (i, v) => {
+        if (i < $colStart) x -= v.width;
+        width += v.width;
       });
-      return { x, w };
+      return { x, width };
     }
     const { x } = $cols.get(index);
-    let w = 0;
-    rangeEach(index, eIndex, (i) => $col(i), (i, { width }) => {
-      w += width;
+    let width = 0;
+    rangeEach(index, eIndex, (i) => $col(i), (i, v) => {
+      width += v.width;
     });
-    return { x, w };
+    return { x, width };
   }
+
+  // { ri, ci, left, top, width, height }
+  // cell(x, y) {
+  // }
 
   // cr: CellRange
   rect(cr) {
