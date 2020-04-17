@@ -101,3 +101,19 @@ export function newCellRange(ref) {
   const end = expr2xy(ary[1]);
   return new CellRange(start[1], start[0], end[1], end[0]);
 }
+
+export function eachCellRanges(refs, cb) {
+  if (refs && refs.length > 0) {
+    refs.forEach((ref) => {
+      cb(newCellRange(ref));
+    });
+  }
+}
+
+export function findCellRanges(refs, cb) {
+  if (refs && refs.length > 0) {
+    const it = refs.find((ref) => cb(newCellRange(ref)));
+    return it ? newCellRange(it) : null;
+  }
+  return null;
+}

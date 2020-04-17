@@ -58,7 +58,7 @@ function newIndexViewAreas([area1, area2, area3, area4]) {
 //  3 | 4
 // return [type, {row, col,  x, y, width, height }, evt]
 function cellInAreas([area1, area2, area3, area4],
-  [iarea1, iarea21, iarea23, iarea3], x, y) {
+  [iarea1, iarea21, iarea23, iarea3], x, y, merges) {
   const inIndexRows = x < area2.x;
   const inIndexCols = y < area2.y;
   // const { $indexColWidth } = this;
@@ -68,7 +68,7 @@ function cellInAreas([area1, area2, area3, area4],
     }];
   }
 
-  const cellfn = (a) => a.cell(x, y);
+  const cellfn = (a) => a.cell(x, y, merges);
 
   if (inIndexRows) {
     if (iarea23.iny(y)) {
@@ -93,12 +93,13 @@ function cellInAreas([area1, area2, area3, area4],
 }
 
 export default class ViewAreas {
-  constructor(builder) {
-    this.body = newViewAreas.call(builder);
-    this.index = newIndexViewAreas.call(builder, this.body);
+  constructor(t) {
+    this.merges = t.$merges;
+    this.body = newViewAreas.call(t);
+    this.index = newIndexViewAreas.call(t, this.body);
   }
 
   cell(x, y) {
-    return cellInAreas(this.body, this.index, x, y);
+    return cellInAreas(this.body, this.index, x, y, this.merges);
   }
 }

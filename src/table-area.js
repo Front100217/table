@@ -1,4 +1,4 @@
-import CellRange from './cell-range';
+import CellRange, { findCellRanges } from './cell-range';
 
 function rangeEach(min, max, getv, cb) {
   for (let i = min; i <= max; i += 1) {
@@ -115,7 +115,9 @@ export default class TableArea extends CellRange {
       let y = 0;
       let height = 0;
       rangeEach(index, eIndex, (i) => $row(i), (i, v) => {
-        if (i < $rowStart) y -= v.height;
+        if (i < $rowStart) {
+          y -= v.height;
+        }
         height += v.height;
       });
       return { y, height };
@@ -166,10 +168,20 @@ export default class TableArea extends CellRange {
   // row: row-index
   // col: col-index
   // { row, col, x, y, width, height }
-  cell(x, y) {
-    return endCell(this.$row, this.$col,
+  cell(x, y, merges) {
+    const ret = endCell(this.$row, this.$col,
       this.$rowStart, this.$colStart, this.$rowEnd, this.$colEnd,
       this.$x, this.$y, x, y);
+    const cr = findCellRanges(merges,
+      (it) => it.includes(ret.row, ret.col));
+    if (cr) {
+      return {
+        row: cr.rowStart,
+        col: cr.colStart,
+        ...this.rect(cr),
+      };
+    }
+    return ret;
   }
 
   // cr: CellRange

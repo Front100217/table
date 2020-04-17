@@ -1,5 +1,5 @@
 import { cellRender } from './cell-render';
-import { newCellRange } from './cell-range';
+import { eachCellRanges } from './cell-range';
 import { newArea } from './table-area';
 import { expr2xy } from './alphabet';
 
@@ -52,15 +52,12 @@ function renderCells(draw, type, area, cell, cellStyle, select, selectStyle, mer
   });
 
   // render merges
-  if (merges && merges.length > 0) {
-    merges.forEach((merge) => {
-      const a = newCellRange(merge);
-      if (a.intersects(area)) {
-        renderCell(draw, a.rowStart, a.colStart,
-          cell, area.rect(a), cellStyle);
-      }
-    });
-  }
+  eachCellRanges(merges, (it) => {
+    if (it.intersects(area)) {
+      renderCell(draw, it.rowStart, it.colStart,
+        cell, area.rect(it), cellStyle);
+    }
+  });
 
   // render select
   if (select && area.intersects(select)) {
