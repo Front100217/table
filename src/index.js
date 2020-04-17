@@ -1,10 +1,10 @@
 /* global window, document */
 /* eslint func-names: ["error", "never"] */
-import { stringAt, expr2xy } from './alphabet';
+import { stringAt } from './alphabet';
 import Canvas2d from './canvas2d';
-import { newArea } from './table-area';
 import { newCellRange } from './cell-range';
 import { render } from './render';
+import ViewAreas from './view-areas';
 
 function bind(target, eventName, func) {
   let name = eventName;
@@ -14,62 +14,6 @@ function bind(target, eventName, func) {
   }
   target.addEventListener(name, func);
 }
-
-function $newArea(rowStart, colStart, rowEnd, colEnd, x, y) {
-  return newArea(rowStart, colStart, rowEnd, colEnd,
-    this.$col, this.$row, x, y);
-}
-
-//                |
-//    2(top-left) | 1(top-right)
-// ------------------------------------
-// 3(bottom-left) | 4(bottom-right)
-//                |
-function $newViewAreas() {
-  const {
-    $rowStart, $colStart, $width, $height,
-  } = this;
-  const tx = this.$indexColWidth;
-  const ty = this.indexRowsHeight;
-  const [fc, fr] = expr2xy(this.$freeze);
-  // console.log('fc:', fc, ', fr:', fr);
-  const area2 = $newArea.call(this, $rowStart, $colStart, fr - 1, fc - 1, tx, ty);
-  const rowStart4 = fr + this.$scrollRow;
-  const colStart4 = fc + this.$scrollCol;
-  let rowEnd = rowStart4;
-  let totalHeight = area2.height;
-  while (totalHeight < $height && rowEnd < this.$rowsLength) {
-    const { height, hide } = this.$row(rowEnd);
-    if (hide !== true) {
-      totalHeight += height;
-      rowEnd += 1;
-    }
-  }
-  let colEnd = colStart4;
-  let totalWidth = area2.width;
-  while (totalWidth < $width && colEnd < this.$colsLength) {
-    const { width, hide } = this.$col(colEnd);
-    if (hide !== true) {
-      totalWidth += width;
-      colEnd += 1;
-    }
-  }
-  const area4 = $newArea.call(this, rowStart4, colStart4, rowEnd, colEnd,
-    tx + area2.width, ty + area2.height);
-  const area1 = $newArea.call(this, $rowStart, colStart4, fr - 1, colEnd,
-    tx + area2.width, ty + 0);
-  const area3 = $newArea.call(this, rowStart4, $colStart, rowEnd, fc - 1,
-    tx + 0, ty + area2.height);
-  // console.log('area1:', area1, ', area2:', area2, ', area3:', area3, ', area4:', area4);
-  return [area1, area2, area3, area4];
-}
-
-// event
-function $clickHandler(viewAreas, evt) {
-  const { offsetX, offsetY } = evt;
-  console.log('click.evt:', evt, viewAreas);
-}
-// --- end ---
 
 class Table {
   $drawMap = new Map();
@@ -161,6 +105,9 @@ class Table {
 
   $merges = [];
 
+  // on-eventName
+  $onClick = () => {};
+
   constructor(width, height) {
     this.$width = width;
     this.$height = height;
@@ -177,14 +124,17 @@ class Table {
     if (typeof target === 'string') {
       el = document.querySelector(target);
     }
-    const viewAreas = $newViewAreas.call(this);
+    const viewAreas = new ViewAreas(this);
     if (!$drawMap.has(el)) {
       // bind events
-      bind(el, 'click', $clickHandler.bind(this, viewAreas));
+      bind(el, 'click', (evt) => {
+        const cell = viewAreas.cell(evt.offsetX, evt.offsetY);
+        this.$onClick(...cell, evt);
+      });
       $drawMap.set(el, Canvas2d.create(el));
     }
     const draw = $drawMap.get(el);
-    render.call(this, draw, viewAreas);
+    render.call(this, draw, viewAreas.body, viewAreas.index);
     return this;
   }
 
@@ -221,6 +171,7 @@ class Table {
   'indexRowHeight', 'indexRowsLength', 'indexColWidth', 'indexColText',
   'cell', 'indexColCell', 'indexRowCell',
   'merges', 'indexMerges',
+  'onClick',
 ].forEach((it) => {
   Table.prototype[it] = function (arg) {
     this[`$${it}`] = arg;

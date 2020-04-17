@@ -7,6 +7,47 @@ function rangeEach(min, max, getv, cb) {
   }
 }
 
+function endRow(row, minRow, maxRow, miny, maxy) {
+  let r = minRow;
+  let y = miny;
+  let lasth = 0;
+  while (y < maxy && r < maxRow) {
+    const { height, hide } = row(r);
+    if (hide !== true) {
+      lasth = height;
+      y += height;
+    }
+    r += 1;
+  }
+  y -= lasth;
+  return { row: r - 1, y, height: lasth };
+}
+
+function endCol(col, minCol, maxCol, minx, maxx) {
+  let c = minCol;
+  let x = minx;
+  let lastw = 0;
+  while (x < maxx && c < maxCol) {
+    const { width, hide } = col(c);
+    if (hide !== true) {
+      lastw = width;
+      x += width;
+    }
+    c += 1;
+  }
+  x -= lastw;
+  return { col: c - 1, x, width: lastw };
+}
+
+export function endCell(row, col,
+  minRow, minCol, maxRow, maxCol,
+  minx, miny, maxx, maxy) {
+  return {
+    ...endRow(row, minRow, maxRow, miny, maxy),
+    ...endCol(col, minCol, maxCol, minx, maxx),
+  };
+}
+
 export default class TableArea extends CellRange {
   constructor(rowStart, colStart, rowEnd, colEnd, col, row, x = 0, y = 0) {
     super(rowStart, colStart, rowEnd, colEnd);
@@ -110,9 +151,26 @@ export default class TableArea extends CellRange {
     return { x, width };
   }
 
-  // { ri, ci, left, top, width, height }
-  // cell(x, y) {
-  // }
+  inx(x) {
+    return x >= this.$x && x < (this.$x + this.$width);
+  }
+
+  iny(y) {
+    return y >= this.$y && y < (this.$y + this.$height);
+  }
+
+  inxy(x, y) {
+    return this.inx(x) && this.iny(y);
+  }
+
+  // row: row-index
+  // col: col-index
+  // { row, col, x, y, width, height }
+  cell(x, y) {
+    return endCell(this.$row, this.$col,
+      this.$rowStart, this.$colStart, this.$rowEnd, this.$colEnd,
+      this.$x, this.$y, x, y);
+  }
 
   // cr: CellRange
   rect(cr) {

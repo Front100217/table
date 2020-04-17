@@ -104,8 +104,7 @@ function renderIndexRows(draw, area) {
     const nselect = this.$select.clone();
     nselect.colStart = 0;
     nselect.colEnd = 0;
-    renderLinesAndCells(draw, 'index-rows',
-      newArea(area.rowStart, 0, area.rowEnd, 0, () => ({ width: this.$indexColWidth }), this.$row),
+    renderLinesAndCells(draw, 'index-rows', area,
       this.$indexRowCell, this.$indexStyle, this.$indexLineStyle,
       nselect, this.$selectStyle);
     draw.restore();
@@ -118,10 +117,8 @@ function renderIndexCols(draw, area) {
     draw.save().translate(area.x, 0);
     const nselect = this.$select.clone();
     nselect.rowStart = 0;
-    nselect.rowEnd = this.$indexRowsLength - 1;
-    renderLinesAndCells(draw, 'index-cols',
-      newArea(0, area.colStart, nselect.rowEnd, area.colEnd,
-        this.$col, () => ({ height: this.$indexRowHeight })),
+    nselect.rowEnd = area.rowEnd;
+    renderLinesAndCells(draw, 'index-cols', area,
       this.$indexColCell, this.$indexStyle, this.$indexLineStyle,
       nselect, this.$selectStyle, this.$indexMerges);
     draw.restore();
@@ -141,14 +138,16 @@ function renderFreezeLines(draw, x, y) {
   const { width, color } = this.$freezeLineStyle;
   // console.log('width:', width, color, fr, fc);
   if (width > 0 && (fr > 0 || fc > 0)) {
-    draw.save().attr({ lineWidth: width, strokeStyle: color });
+    draw.save().beginPath().attr({ lineWidth: width, strokeStyle: color });
     if (fr > 0) draw.line([0, y], [this.$width, y]);
     if (fc > 0) draw.line([x, 0], [x, this.$height]);
     draw.restore();
   }
 }
 
-export function render(draw, [area1, area2, area3, area4]) {
+export function render(draw,
+  [area1, area2, area3, area4],
+  [iarea1, iarea21, iarea23, iarea3]) {
   // const tx = this.$indexColWidth;
   // const ty = this.indexRowsHeight;
   // const { width, height } = area2;
@@ -159,16 +158,16 @@ export function render(draw, [area1, area2, area3, area4]) {
 
   // render area-1
   renderBody.call(this, draw, area1);
-  renderIndexCols.call(this, draw, area1);
+  renderIndexCols.call(this, draw, iarea1);
 
   // render area-3
   renderBody.call(this, draw, area3);
-  renderIndexRows.call(this, draw, area3);
+  renderIndexRows.call(this, draw, iarea3);
 
   // render area-2
   renderBody.call(this, draw, area2);
-  renderIndexRows.call(this, draw, area2);
-  renderIndexCols.call(this, draw, area2);
+  renderIndexCols.call(this, draw, iarea21);
+  renderIndexRows.call(this, draw, iarea23);
 
   // render freeze
   renderFreezeLines.call(this, draw, area4.x, area4.y);

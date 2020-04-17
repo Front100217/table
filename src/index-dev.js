@@ -11,4 +11,7 @@ Table.create(800, 500)
   .scrollRow(2)
   .scrollCol(1)
   .cell((ri, ci) => `${ri}-${ci}`)
-  .to('#table-render');
+  .onClick((type, cell) => {
+    console.log('click.type:', type, ', cell:', cell);
+  })
+  .to('#table');
