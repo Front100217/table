@@ -90,10 +90,10 @@ function fontString(family, size, italic, bold) {
 // draw: Canvas2d
 // style:
 export function cellRender(draw, text, rect, {
-  border, fontSize, fontFamily,
+  border, fontSize, fontName,
   bold, italic, color, bgcolor,
   align, valign, underline, strike,
-  textwrap, padding,
+  rotate, textwrap, padding,
 } = {}) {
   // at first move to (left, top)
   draw.save().beginPath()
@@ -112,9 +112,13 @@ export function cellRender(draw, text, rect, {
   draw.save().beginPath().attr({
     textAlign: align,
     textBaseline: valign,
-    font: fontString(fontFamily, fontSize, italic, bold),
+    font: fontString(fontName, fontSize, italic, bold),
     fillStyle: color,
   });
+  // rotate
+  if (rotate && rotate > 0) {
+    draw.rotate(rotate * (Math.PI / 180));
+  }
 
   const [xp, yp] = padding || [5, 5];
   const tx = textx(align, rect.width, xp);

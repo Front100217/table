@@ -1,8 +1,13 @@
 import { cellRender } from './cell-render';
-import { eachCellRanges } from './cell-range';
-import { newArea } from './table-area';
-import { expr2xy } from './alphabet';
+import { eachRanges } from './range';
+import { newArea } from './area';
 
+/**
+ * render the grid lines
+ * @param {Canvas2d} draw
+ * @param {Area} area
+ * @param {width, color} param2 the line style
+ */
 function renderLines(draw, area, { width, color }) {
   // render row-col-lines
   if (width > 0) {
@@ -10,12 +15,12 @@ function renderLines(draw, area, { width, color }) {
     draw.save().beginPath()
       .attr({ lineWidth: width, strokeStyle: color });
 
-    area.rowEach((ri, v) => {
+    area.eachRow((ri, v) => {
       const h = v.y + v.height;
       draw.line([0, h], [area.width, h]);
     });
 
-    area.colEach((ci, v) => {
+    area.eachCol((ci, v) => {
       const w = v.x + v.width;
       draw.line([w, 0], [w, area.height]);
     });
@@ -23,8 +28,15 @@ function renderLines(draw, area, { width, color }) {
   }
 }
 
-// select: CellRange
-// type: index-rows | index-cols | content
+/**
+ * render cell given params
+ * @param {Canvas2d} draw
+ * @param {int} ri the row index
+ * @param {int} ci the col index
+ * @param {Function} cell { text, style, type ...}
+ * @param {x, y, width, height} cellRect
+ * @param {style} cellStyle the style of default-cell
+ */
 function renderCell(draw, ri, ci, cell, cellRect, cellStyle) {
   const c = cell(ri, ci);
   let text = '';
@@ -42,8 +54,18 @@ function renderCell(draw, ri, ci, cell, cellRect, cellStyle) {
   cellRender(draw, text, cellRect, style);
 }
 
-// type: index-rows | index-cols | content
-function renderCells(draw, type, area, cell, cellStyle, select, selectStyle, merges) {
+/**
+ * render cells
+ * @param {Canvas2d} draw
+ * @param {string} type 'row-header' | 'col-header' | 'body'
+ * @param {Area} area
+ * @param {Function} cell
+ * @param {style} cellStyle
+ * @param {Range} selection
+ * @param {style} selectionStyle
+ * @param {Array<string>} merges
+ */
+function renderCells(draw, type, area, cell, cellStyle, selection, selectionStyle, merges) {
   draw.save().rect(0, 0, area.width, area.height).clip();
   // const [rs, cs, re, ce] = area;
   area.each((ri, ci, rect) => {
@@ -52,26 +74,26 @@ function renderCells(draw, type, area, cell, cellStyle, select, selectStyle, mer
   });
 
   // render merges
-  eachCellRanges(merges, (it) => {
+  eachRanges(merges, (it) => {
     if (it.intersects(area)) {
-      renderCell(draw, it.rowStart, it.colStart,
+      renderCell(draw, it.startRow, it.startCol,
         cell, area.rect(it), cellStyle);
     }
   });
 
-  // render select
-  if (select && area.intersects(select)) {
+  // render selection
+  if (selection && area.intersects(selection)) {
     const {
       x, y, width, height,
-    } = area.rect(select);
-    const { bgcolor, borderWidth, borderColor } = selectStyle;
-    const bw = type === 'content' ? borderWidth : 0;
+    } = area.rect(selection);
+    const { bgcolor, borderWidth, borderColor } = selectionStyle;
+    const bw = type === 'body' ? borderWidth : 0;
     const bw2 = bw * 2;
     draw.save()
       .attr({ fillStyle: bgcolor })
       .rect(x + bw, y + bw, width - bw2, height - bw2)
       .fill();
-    if (type === 'content') {
+    if (type === 'body') {
       draw.attr({
         strokeStyle: borderColor,
         lineWidth: borderWidth,
@@ -82,56 +104,55 @@ function renderCells(draw, type, area, cell, cellStyle, select, selectStyle, mer
   draw.restore();
 }
 
-// type: index | content
-// cell: Function
-// cellStyle: cell-style
-// select: CellRange
 function renderLinesAndCells(draw, type, area,
-  cell, cellStyle, lineStyle, select, selectStyle, merges) {
+  cell, cellStyle, lineStyle, selection, selectionStyle, merges) {
   renderLines(draw, area, lineStyle);
   renderCells(draw, type, area, cell, cellStyle,
-    select, selectStyle, merges);
+    selection, selectionStyle, merges);
 }
 
 // private methods --- start ----
-function renderIndexRows(draw, area) {
+
+function renderRowHeader(draw, area) {
+  const { cell, width } = this.$rowHeader;
   // render row-index
-  if (this.$indexColWidth > 0) {
+  if (width > 0) {
     draw.save().translate(0, area.y);
-    const nselect = this.$select.clone();
-    nselect.colStart = 0;
-    nselect.colEnd = 0;
-    renderLinesAndCells(draw, 'index-rows', area,
-      this.$indexRowCell, this.$indexStyle, this.$indexLineStyle,
-      nselect, this.$selectStyle);
+    const nselection = this.$selection.clone();
+    nselection.startCol = 0;
+    nselection.endCol = 0;
+    renderLinesAndCells(draw, 'row-header', area,
+      cell, this.$headerCellStyle, this.$headerLineStyle,
+      nselection, this.$selectionStyle);
     draw.restore();
   }
 }
 
-function renderIndexCols(draw, area) {
+function renderColHeader(draw, area) {
+  const { cell, height, merges } = this.$colHeader;
   // render col-index
-  if (this.indexRowsHeight > 0) {
+  if (height > 0) {
     draw.save().translate(area.x, 0);
-    const nselect = this.$select.clone();
-    nselect.rowStart = 0;
-    nselect.rowEnd = area.rowEnd;
-    renderLinesAndCells(draw, 'index-cols', area,
-      this.$indexColCell, this.$indexStyle, this.$indexLineStyle,
-      nselect, this.$selectStyle, this.$indexMerges);
+    const nselection = this.$selection.clone();
+    nselection.startRow = 0;
+    nselection.endRow = area.endRow;
+    renderLinesAndCells(draw, 'col-header', area,
+      cell, this.$headerCellStyle, this.$headerLineStyle,
+      nselection, this.$selectionStyle, merges);
     draw.restore();
   }
 }
 
 function renderBody(draw, area) {
   draw.save().translate(area.x, area.y);
-  renderLinesAndCells(draw, 'content', area,
+  renderLinesAndCells(draw, 'body', area,
     this.$cell, this.$cellStyle, this.$lineStyle,
-    this.$select, this.$selectStyle, this.$merges);
+    this.$selection, this.$selectionStyle, this.$merges);
   draw.restore();
 }
 
 function renderFreezeLines(draw, x, y) {
-  const [fc, fr] = expr2xy(this.$freeze);
+  const [fr, fc] = this.$freeze;
   const { width, color } = this.$freezeLineStyle;
   // console.log('width:', width, color, fr, fc);
   if (width > 0 && (fr > 0 || fc > 0)) {
@@ -145,9 +166,6 @@ function renderFreezeLines(draw, x, y) {
 export function render(draw,
   [area1, area2, area3, area4],
   [iarea1, iarea21, iarea23, iarea3]) {
-  // const tx = this.$indexColWidth;
-  // const ty = this.indexRowsHeight;
-  // const { width, height } = area2;
   draw.resize(this.$width, this.$height);
 
   // render area-4
@@ -155,16 +173,16 @@ export function render(draw,
 
   // render area-1
   renderBody.call(this, draw, area1);
-  renderIndexCols.call(this, draw, iarea1);
+  renderColHeader.call(this, draw, iarea1);
 
   // render area-3
   renderBody.call(this, draw, area3);
-  renderIndexRows.call(this, draw, iarea3);
+  renderRowHeader.call(this, draw, iarea3);
 
   // render area-2
   renderBody.call(this, draw, area2);
-  renderIndexCols.call(this, draw, iarea21);
-  renderIndexRows.call(this, draw, iarea23);
+  renderColHeader.call(this, draw, iarea21);
+  renderRowHeader.call(this, draw, iarea23);
 
   // render freeze
   renderFreezeLines.call(this, draw, area4.x, area4.y);
@@ -172,9 +190,9 @@ export function render(draw,
   // left-top
   const { x, y } = area2;
   if (x > 0 && y > 0) {
-    renderLinesAndCells(draw, 'index',
+    renderLinesAndCells(draw, 'header',
       newArea(0, 0, 0, 0, () => ({ width: x }), () => ({ height: y })),
-      () => '', this.$indexStyle, this.$indexLineStyle);
+      () => '', this.$headerCellStyle, this.$headerLineStyle);
   }
 }
 

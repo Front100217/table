@@ -1,10 +1,10 @@
 /* global window, document */
 /* eslint func-names: ["error", "never"] */
-import { stringAt } from './alphabet';
+import { stringAt, expr2xy } from './alphabet';
 import Canvas2d from './canvas2d';
-import { newCellRange } from './cell-range';
+import { newRange } from './range';
 import { render } from './render';
-import ViewAreas from './view-areas';
+import Viewport from './viewport';
 
 function bind(target, eventName, func) {
   let name = eventName;
@@ -15,79 +15,63 @@ function bind(target, eventName, func) {
   target.addEventListener(name, func);
 }
 
+/**
+ * ----------------------------------------------------------------
+ * |            | column header                                   |
+ * ----------------------------------------------------------------
+ * |            |                                                 |
+ * | row header |              body                               |
+ * |            |                                                 |
+ * ----------------------------------------------------------------
+ * row { height, hide, autoFit }
+ * col { width, hide, autoFit }
+ * cell {
+ *   text,
+ *   style: {
+ *     border, fontSize, fontName,
+ *     bold, italic, color, bgcolor,
+ *     align, valign, underline, strike,
+ *     rotate, textwrap, padding,
+ *   },
+ *   type: text | button | link | checkbox | radio | list | progress | image | imageButton | date
+ * }
+ */
 class Table {
   $drawMap = new Map();
 
-  $rowsLength = 100;
+  // the count of rows
+  $rows = 100;
 
-  $colsLength = 26;
+  // the count of cols;
+  $cols = 26;
 
-  $rowStart = 0;
+  /**
+   * get row given rowIndex
+   * @param {int} rowIndex
+   * @returns { height, hide, autoFit } row
+   */
+  $row = () => ({ height: 25, hide: false, autoFit: false });
 
-  $colStart = 0;
+  /**
+   * get col given colIndex
+   * @param {int} coIndex
+   * @returns { width, hide, autoFit } col
+   */
+  $col = () => ({ width: 100, hide: false, autoFit: false });
 
-  $row = () => ({ height: 25, hide: false });
+  /**
+   * get cell given rowIndex, colIndex
+   * @param {int} rowIndex
+   * @param {int} colIndex
+   * @returns { text, style, type, ...} cell
+   */
+  $cell = () => '';
 
-  $col = () => ({ width: 100, hide: false });
-
-  // line-style
   $lineStyle = {
     width: 1,
     color: '#e6e6e6',
   };
 
-  // scroll
-  $scrollRow = 0;
-
-  $scrollCol = 0;
-
-  // freeze: A1
-  $freeze = 'A1';
-
-  $freezeLineStyle = {
-    width: 2,
-    color: '#d8d8d8',
-  };
-
-  // index...
-  $indexRowHeight = 25;
-
-  $indexRowsLength = 1;
-
-  $indexRowCell = (r) => r + 1;
-
-  $indexColWidth = 60;
-
-  $indexColCell = (r, c) => stringAt(c);
-
-  $indexMerges = [];
-
-  $indexLineStyle = {
-    width: 1,
-    color: '#e6e6e6',
-  };
-
-  // index-style
-  $indexStyle = {
-    bgcolor: '#f4f5f8',
-    align: 'center',
-    valign: 'middle',
-    fontSize: 9,
-    fontFamily: 'Source Sans Pro',
-    color: '#585757',
-  };
-
-  // select-area
-  // 'A1:B1'
-  $select = undefined;
-
-  $selectStyle = {
-    borderWidth: 2,
-    borderColor: '#4b89ff',
-    bgcolor: '#4b89ff14',
-  };
-
-  // cell
   $cellStyle = {
     bgcolor: '#ffffff',
     align: 'left',
@@ -97,24 +81,91 @@ class Table {
     color: '#0a0a0a',
     bold: false,
     italic: false,
+    rotate: 0,
     fontSize: 9,
-    fontFamily: 'Source Sans Pro',
+    fontName: 'Source Sans Pro',
   };
-
-  $cell = () => '';
 
   $merges = [];
 
-  // on-eventName
+  // row header
+  $rowHeader = {
+    width: 60,
+    cell(r) {
+      return r + 1;
+    },
+  }
+
+  // column header
+  $colHeader = {
+    height: 25,
+    rows: 1,
+    merges: [],
+    cell(r, c) {
+      return stringAt(c);
+    },
+    get rowHeight() {
+      return this.height / this.rows;
+    },
+  }
+
+  $headerLineStyle = {
+    width: 1,
+    color: '#e6e6e6',
+  };
+
+  $headerCellStyle = {
+    bgcolor: '#f4f5f8',
+    align: 'center',
+    valign: 'middle',
+    color: '#585757',
+    fontSize: 9,
+    fontName: 'Source Sans Pro',
+  };
+
+  // a highlight cell without background filled shows as focused cell
+  $focus = undefined;
+
+  // The selection range contains multiple cells
+  $selection = undefined;
+
+  $selectionStyle = {
+    borderWidth: 2,
+    borderColor: '#4b89ff',
+    bgcolor: '#4b89ff14',
+  };
+
+  // row of the start position in table
+  $startRow = 0;
+
+  // col of the start position in table
+  $startCol = 0;
+
+  // scroll to row
+  $scrollRow = 0;
+
+  // scroll to col
+  $scrollCol = 0;
+
+  // freezed cell
+  $freeze = 'A1';
+
+  $freezeLineStyle = {
+    width: 2,
+    color: '#d8d8d8',
+  };
+
+  /**
+   * trigger the event by clicking
+   * @param {int} type
+   * @param {row, col,  x, y, width, height } cellRect
+   * @param {Event} evt
+   */
   $onClick = () => {};
 
   constructor(width, height) {
     this.$width = width;
     this.$height = height;
-  }
-
-  get indexRowsHeight() {
-    return this.$indexRowHeight * this.$indexRowsLength;
   }
 
   // target: cssSelector | element
@@ -124,38 +175,41 @@ class Table {
     if (typeof target === 'string') {
       el = document.querySelector(target);
     }
-    const viewAreas = new ViewAreas(this);
+    const viewport = new Viewport(this);
     if (!$drawMap.has(el)) {
       // bind events
       bind(el, 'click', (evt) => {
-        const cell = viewAreas.cell(evt.offsetX, evt.offsetY);
+        const cell = viewport.cell(evt.offsetX, evt.offsetY);
         this.$onClick(...cell, evt);
       });
       $drawMap.set(el, Canvas2d.create(el));
     }
     const draw = $drawMap.get(el);
-    render.call(this, draw, viewAreas.body, viewAreas.index);
+    render.call(this, draw, viewport.body, viewport.header);
     return this;
   }
 
-  select(ref) {
-    this.$select = newCellRange(ref);
+  // ref: 'A1:B2' | 'A:B' | '1:4' | 'A1'
+  selection(ref) {
+    this.$selection = newRange(ref);
+    this.$focus = [this.$selection.startRow, this.$selection.startCol];
     return this;
   }
 
+  // ref: 'A1:B2' | 'A:B' | '1:4' | 'A1'
   freeze(ref) {
     if (ref !== 'A1') {
-      this.$rowStart = this.$scrollRow;
-      this.$colStart = this.$scrollCol;
+      this.$startRow = this.$scrollRow;
+      this.$startCol = this.$scrollCol;
       this.$scrollRow = 0;
       this.$scrollCol = 0;
     } else {
-      this.$scrollRow = this.$rowStart;
-      this.$scrollCol = this.$colStart;
-      this.$rowStart = 0;
-      this.$colStart = 0;
+      this.$scrollRow = this.$startRow;
+      this.$scrollCol = this.$startCol;
+      this.$startRow = 0;
+      this.$startCol = 0;
     }
-    this.$freeze = ref;
+    this.$freeze = expr2xy(ref).reverse();
     return this;
   }
 
@@ -166,11 +220,9 @@ class Table {
 
 // single property
 [
-  'width', 'height', 'rowsLength', 'colsLength',
-  'scrollRow', 'scrollCol',
-  'indexRowHeight', 'indexRowsLength', 'indexColWidth', 'indexColText',
-  'cell', 'indexColCell', 'indexRowCell',
-  'merges', 'indexMerges',
+  'width', 'height', 'rows', 'cols', 'row', 'col', 'cell',
+  'startRow', 'startCol', 'scrollRow', 'scrollCol',
+  'merges',
   'onClick',
 ].forEach((it) => {
   Table.prototype[it] = function (arg) {
@@ -181,8 +233,10 @@ class Table {
 
 // object property
 [
-  'lineStyle', 'cellStyle', 'indexStyle', 'indexLineStyle',
-  'selectStyle', 'freezeLineStyle', 'row', 'col',
+  'lineStyle', 'cellStyle',
+  'headerCellStyle', 'headerLineStyle',
+  'selectionStyle', 'freezeLineStyle',
+  'rowHeader', 'colHeader',
 ].forEach((it) => {
   Table.prototype[it] = function (arg) {
     Object.assign(this[`$${it}`], arg || {});

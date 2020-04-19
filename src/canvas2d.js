@@ -127,7 +127,11 @@ export default class Canvas2d {
   }
 }
 
-['save', 'restore', 'beginPath', 'closePath', 'clip', 'fill'].forEach((it) => {
+[
+  'save', 'restore',
+  'beginPath', 'closePath',
+  'clip', 'fill', 'rotate',
+].forEach((it) => {
   Canvas2d.prototype[it] = function (...args) {
     this.ctx[it](...args);
     return this;
