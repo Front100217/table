@@ -115,6 +115,7 @@ export function cellRender(draw, text, rect, {
     font: fontString(fontName, fontSize, italic, bold),
     fillStyle: color,
   });
+
   // rotate
   if (rotate && rotate > 0) {
     draw.rotate(rotate * (Math.PI / 180));
