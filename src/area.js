@@ -1,4 +1,4 @@
-import Range, { findRanges } from './range';
+import Range from './range';
 
 /**
  * each range of row or col
@@ -7,7 +7,7 @@ import Range, { findRanges } from './range';
  * @param {Function} getv (index) => v
  * @param {Function} cb (index, v) => {}
  */
-function eachRange(min, max, getv, cb) {
+export function eachRange(min, max, getv, cb) {
   for (let i = min; i <= max; i += 1) {
     const v = getv(i);
     if (v.hide !== true) cb(i, v);
@@ -192,37 +192,32 @@ export default class Area extends Range {
   }
 
   /**
-   * get cell given x, y, merges in canvas!!!!
+   * get cell given x, y in canvas!!!!
    * @param {int} x offset on x-axis
    * @param {int} y offset on y-axis
-   * @param {Array} merges
    * @returns { row, col, x, y, width, height }
    */
-  cell(x, y, merges) {
-    const ret = endCell(this.$row, this.$col,
+  cell(x, y) {
+    return endCell(this.$row, this.$col,
       this.startRow, this.startCol, this.endRow, this.endCol,
       this.x, this.y, x, y);
-    const cr = findRanges(merges,
-      (it) => it.contains(ret.row, ret.col));
-    if (cr) {
-      return {
-        row: cr.startRow,
-        col: cr.startCol,
-        ...this.rect(cr),
-      };
-    }
-    return ret;
   }
 
   /**
    * get rect given range in area
    * @param {Range} range
+   * @param {boolean} isCanvas
    * @returns { x, y, width, height }
    */
-  rect(range) {
+  rect(range, inCanvas = false) {
+    const c = this.col(range.startCol, range.endCol);
+    const r = this.row(range.startRow, range.endRow);
+    if (inCanvas) {
+      c.x += this.x;
+      r.y += this.y;
+    }
     return {
-      ...this.col(range.startCol, range.endCol),
-      ...this.row(range.startRow, range.endRow),
+      ...c, ...r,
     };
   }
 

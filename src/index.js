@@ -141,11 +141,14 @@ class Table {
   // col of the start position in table
   $startCol = 0;
 
-  // scroll to row
-  $scrollRow = 0;
+  // count of rows scrolled
+  $scrollRows = 0;
 
-  // scroll to col
-  $scrollCol = 0;
+  // count of cols scrolled
+  $scrollCols = 0;
+
+  // count of cols scrolled after freeze
+  $oldScrollCols = 0;
 
   // freezed cell
   $freeze = 'A1';
@@ -199,13 +202,13 @@ class Table {
   // ref: 'A1:B2' | 'A:B' | '1:4' | 'A1'
   freeze(ref) {
     if (ref !== 'A1') {
-      this.$startRow = this.$scrollRow;
-      this.$startCol = this.$scrollCol;
-      this.$scrollRow = 0;
-      this.$scrollCol = 0;
+      this.$startRow = this.$scrollRows;
+      this.$startCol = this.$scrollCols;
+      this.$scrollRows = 0;
+      this.$scrollCols = 0;
     } else {
-      this.$scrollRow = this.$startRow;
-      this.$scrollCol = this.$startCol;
+      this.$scrollRows = this.$startRow;
+      this.$scrollCols = this.$startCol;
       this.$startRow = 0;
       this.$startCol = 0;
     }
@@ -221,7 +224,7 @@ class Table {
 // single property
 [
   'width', 'height', 'rows', 'cols', 'row', 'col', 'cell',
-  'startRow', 'startCol', 'scrollRow', 'scrollCol',
+  'startRow', 'startCol', 'scrollRows', 'scrollCols',
   'merges',
   'onClick',
 ].forEach((it) => {

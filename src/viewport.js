@@ -1,4 +1,5 @@
-import { endCell, newArea } from './area';
+import { endCell, eachRange, newArea } from './area';
+import { findRanges } from './range';
 
 function $newArea(startRow, startCol, endRow, endCol, x, y) {
   return newArea(startRow, startCol, endRow, endCol,
@@ -13,7 +14,7 @@ function $newArea(startRow, startCol, endRow, endCol, x, y) {
 function $newBodyAreas() {
   const {
     $startRow, $startCol, $width, $height,
-    $colHeader, $rowHeader, $scrollRow, $scrollCol,
+    $colHeader, $rowHeader, $scrollRows, $scrollCols,
     $freeze, $row, $col, $rows, $cols,
   } = this;
   const tx = $rowHeader.width;
@@ -21,8 +22,8 @@ function $newBodyAreas() {
   const [fr, fc] = $freeze;
   // console.log('fc:', fc, ', fr:', fr);
   const area2 = $newArea.call(this, $startRow, $startCol, fr - 1, fc - 1, tx, ty);
-  const startRow4 = fr + $scrollRow;
-  const startCol4 = fc + $scrollCol;
+  const startRow4 = fr + $scrollRows;
+  const startCol4 = fc + $scrollCols;
   const { row, col } = endCell($row, $col,
     startRow4, startCol4, $rows, $cols,
     area2.width, area2.height, $width, $height);
@@ -63,7 +64,8 @@ function $newHeaderAreas([area1, area2, area3, area4]) {
 //  3 | 4
 // return [type, {row, col,  x, y, width, height }, evt]
 function cellInAreas([area1, area2, area3, area4],
-  [iarea1, iarea21, iarea23, iarea3], x, y, merges) {
+  [iarea1, iarea21, iarea23, iarea3], x, y) {
+  const { $merges, $row, $col } = this;
   const inIndexRows = x < area2.x;
   const inIndexCols = y < area2.y;
   // const { $indexColWidth } = this;
@@ -73,7 +75,41 @@ function cellInAreas([area1, area2, area3, area4],
     }];
   }
 
-  const cellfn = (a) => a.cell(x, y, merges);
+  const cellfn = (a) => {
+    let ret = a.cell(x, y);
+    const cr = findRanges($merges, (it) => it.contains(ret.row, ret.col));
+    if (cr) {
+      const {
+        startRow, startCol, endRow, endCol,
+      } = cr;
+      const gap = { width: 0, height: 0 };
+      eachRange(area2.endRow + 1, area4.startRow - 1, $row, (i, { height }) => {
+        if (i <= endRow) gap.height += height;
+      });
+      eachRange(area2.endCol + 1, area4.startCol - 1, $col, (i, { width }) => {
+        if (i <= endCol) gap.width += width;
+      });
+      if (area2.contains(startRow, startCol)) {
+        ret = area2.rect(cr, true);
+        ret.width -= gap.width;
+        ret.height -= gap.height;
+      } else if (area1.contains(startRow, startCol)) {
+        ret = area1.rect(cr, true);
+        ret.height -= gap.height;
+      } else if (area3.contains(startRow, startCol)) {
+        ret = area3.rect(cr, true);
+        ret.width -= gap.width;
+      } else {
+        ret = area4.rect(cr, true);
+      }
+      return {
+        row: startRow,
+        col: startCol,
+        ...ret,
+      };
+    }
+    return ret;
+  };
 
   if (inIndexRows) {
     if (iarea23.iny(y)) {
@@ -103,12 +139,12 @@ function cellInAreas([area1, area2, area3, area4],
  */
 export default class Viewport {
   constructor(table) {
-    this.$merges = table.$merges;
+    this.table = table;
     this.body = $newBodyAreas.call(table);
     this.header = $newHeaderAreas.call(table, this.body);
   }
 
   cell(x, y) {
-    return cellInAreas(this.body, this.header, x, y, this.$merges);
+    return cellInAreas.call(this.table, this.body, this.header, x, y);
   }
 }
