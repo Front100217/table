@@ -26,7 +26,7 @@ function endCellRow(row, minRow, maxRow, miny, maxy) {
   let r = minRow;
   let y = miny;
   let lasth = 0;
-  while (y < maxy && r < maxRow) {
+  while (y < maxy && r <= maxRow) {
     const { height, hide } = row(r);
     if (hide !== true) {
       lasth = height;
@@ -50,7 +50,7 @@ function endCellCol(col, minCol, maxCol, minx, maxx) {
   let c = minCol;
   let x = minx;
   let lastw = 0;
-  while (x < maxx && c < maxCol) {
+  while (x < maxx && c <= maxCol) {
     const { width, hide } = col(c);
     if (hide !== true) {
       lastw = width;
@@ -124,9 +124,7 @@ export default class Area extends Range {
       let y = 0;
       let height = 0;
       eachRange(index, endIndex, (i) => $row(i), (i, v) => {
-        if (i < startRow) {
-          y -= v.height;
-        }
+        if (i < startRow) y -= v.height;
         height += v.height;
       });
       return { y, height };
@@ -194,7 +192,7 @@ export default class Area extends Range {
   }
 
   /**
-   * get cell given x, y, merges
+   * get cell given x, y, merges in canvas!!!!
    * @param {int} x offset on x-axis
    * @param {int} y offset on y-axis
    * @param {Array} merges

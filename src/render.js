@@ -86,12 +86,12 @@ function renderCells(draw, type, area, cell, cellStyle, selection, selectionStyl
     const {
       x, y, width, height,
     } = area.rect(selection);
+    // console.log('x:', x, ', y:', y, ', width:', width, ', height: ', height)
     const { bgcolor, borderWidth, borderColor } = selectionStyle;
     const bw = type === 'body' ? borderWidth : 0;
-    const bw2 = bw * 2;
     draw.save()
       .attr({ fillStyle: bgcolor })
-      .rect(x + bw, y + bw, width - bw2, height - bw2)
+      .rect(x + bw / 2, y + bw / 2, width - bw, height - bw)
       .fill();
     if (type === 'body') {
       draw.attr({
