@@ -1,5 +1,6 @@
 import { endCell, eachRange, newArea } from './area';
-import { findRanges } from './range';
+import Range, { findRanges } from './range';
+import { render } from './render';
 
 function $newArea(startRow, startCol, endRow, endCol, x, y) {
   return newArea(startRow, startCol, endRow, endCol,
@@ -57,6 +58,45 @@ function $newHeaderAreas([area1, area2, area3, area4]) {
     newArea(area3.startRow, 0, area3.endRow, 0,
       () => ({ width: $rowHeader.width }), $row, 0, area4.y),
   ];
+}
+
+function rangeInAreas([area1, area2, area3, area4],
+  [iarea1, iarea21, iarea23, iarea3], x, y) {
+  const { $merges, $rows, $cols } = this;
+  const inIndexRows = x < area2.x;
+  const inIndexCols = y < area2.y;
+  const range = new Range(0, 0, $rows - 1, $cols - 1);
+  const cellfn = (a) => a.cell(x, y);
+  if (inIndexRows && inIndexCols) {
+    return range;
+  }
+
+
+  if (inIndexRows) {
+    const r = cellfn(iarea23.iny(y) ? iarea23 : iarea3).row;
+    range.startRow = r;
+    range.endRow = r;
+    return range;
+  }
+
+  if (inIndexCols) {
+    const c = cellfn(iarea21.inx(x) ? iarea21 : iarea1).col;
+    range.startCol = c;
+    range.endCol = c;
+    return range;
+  }
+
+  const ary = [area4, area2, area1, area3];
+  for (let i = 0; i < ary.length; i += 1) {
+    const area = ary[i];
+    if (area.inxy(x, y)) {
+      const { row, col } = cellfn(area);
+      const cr = findRanges($merges, (it) => it.contains(row, col));
+      if (cr) return cr;
+      return new Range(row, col, row, col);
+    }
+  }
+  return null;
 }
 
 //  2 | 1
@@ -146,5 +186,13 @@ export default class Viewport {
 
   cell(x, y) {
     return cellInAreas.call(this.table, this.body, this.header, x, y);
+  }
+
+  range(x, y) {
+    return rangeInAreas.call(this.table, this.body, this.header, x, y);
+  }
+
+  render(draw) {
+    render.call(this.table, draw, this.body, this.header);
   }
 }

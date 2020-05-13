@@ -18,6 +18,14 @@ export default class Range {
     this.endCol = endCol;
   }
 
+  get start() {
+    return [this.startRow, this.startCol];
+  }
+
+  get end() {
+    return [this.endRow, this.endCol];
+  }
+
   // count of rows contained in this range
   get rows() {
     return this.endRow - this.startRow;

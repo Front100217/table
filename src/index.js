@@ -3,7 +3,6 @@
 import { stringAt, expr2xy } from './alphabet';
 import Canvas2d from './canvas2d';
 import { newRange } from './range';
-import { render } from './render';
 import Viewport from './viewport';
 
 function bind(target, eventName, func) {
@@ -178,24 +177,34 @@ class Table {
     if (typeof target === 'string') {
       el = document.querySelector(target);
     }
+    let draw = $drawMap.get(el);
     const viewport = new Viewport(this);
     if (!$drawMap.has(el)) {
+      draw = Canvas2d.create(el);
+      $drawMap.set(el, draw);
       // bind events
       bind(el, 'click', (evt) => {
         const cell = viewport.cell(evt.offsetX, evt.offsetY);
         this.$onClick(...cell, evt);
       });
-      $drawMap.set(el, Canvas2d.create(el));
+      bind(el, 'mousedown', (evt) => {
+        const range = viewport.range(evt.offsetX, evt.offsetY);
+        this.selection(range);
+        viewport.render(draw);
+      });
     }
-    const draw = $drawMap.get(el);
-    render.call(this, draw, viewport.body, viewport.header);
+    viewport.render(draw);
     return this;
   }
 
   // ref: 'A1:B2' | 'A:B' | '1:4' | 'A1'
   selection(ref) {
-    this.$selection = newRange(ref);
-    this.$focus = [this.$selection.startRow, this.$selection.startCol];
+    if (typeof ref === 'string') {
+      this.$selection = newRange(ref);
+    } else {
+      this.$selection = ref;
+    }
+    this.$focus = this.$selection.start;
     return this;
   }
 
