@@ -6,12 +6,21 @@ import { newRange } from './range';
 import Viewport from './viewport';
 
 function bind(target, eventName, func) {
-  let name = eventName;
-  if (name === 'mousewheel'
-    && /Firefox/i.test(window.navigator.userAgent)) {
-    name = 'DOMMouseScroll';
-  }
-  target.addEventListener(name, func);
+  target.addEventListener(eventName, func);
+}
+
+function unbind(target, eventName, func) {
+  target.removeEventListener(eventName, func);
+}
+
+function bindMouseMoveUp(target, moveFunc, upFunc) {
+  bind(target, 'mousemove', moveFunc);
+  target.bindMouseUp = (evt) => {
+    unbind(target, 'mousemove', moveFunc);
+    unbind(target, 'mouseup', target.bindMouseUp);
+    upFunc(evt);
+  };
+  bind(target, 'mouseup', target.bindMouseup);
 }
 
 /**
@@ -165,6 +174,8 @@ class Table {
    */
   $onClick = () => {};
 
+  $onSelected = () => {};
+
   constructor(width, height) {
     this.$width = width;
     this.$height = height;
@@ -191,6 +202,13 @@ class Table {
         const range = viewport.range(evt.offsetX, evt.offsetY);
         this.selection(range);
         viewport.render(draw);
+        bindMouseMoveUp(el, (e) => {
+          const nrange = viewport.range(e.offsetX, e.offsetY);
+          if (!nrange.within(range)) {
+            this.selection(range.union(nrange));
+            viewport.render(draw);
+          }
+        }, () => {});
       });
     }
     viewport.render(draw);

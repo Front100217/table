@@ -1,7 +1,7 @@
 import { expr2xy } from './alphabet';
 
 /**
- * the range specified by a start position and an end position,
+ * the range spendColfied by a start position and an end position,
  * the smallest range must contain at least one cell.
  * Range is not a merged cell, but it can be merged as a single cell
  * @author myliang
@@ -70,6 +70,18 @@ export default class Range {
   }
 
   /**
+   * check whether or not the range within the other range
+   * @param {Range} other
+   * @returns {boolean}
+   */
+  within(other) {
+    return this.startRow >= other.startRow
+      && this.startCol >= other.startCode
+      && this.endRow <= other.endRow
+      && this.endCol <= other.endCol;
+  }
+
+  /**
    * check whether or not the range intersects the other range
    * @param {Range} other
    * @returns {boolean}
@@ -79,6 +91,20 @@ export default class Range {
       && this.startCol <= other.endCol
       && other.startRow <= this.endRow
       && other.startCol <= this.endCol;
+  }
+
+  /**
+   * the self union the other resulting in the new range
+   * @param {Range} other
+   * @returns {Range} the new range
+   */
+  union(other) {
+    return new Range(
+      other.startRow < this.startRow ? other.startRow : this.startRow,
+      other.startCol < this.startCol ? other.startCol : this.startCol,
+      other.endRow > this.endRow ? other.endRow : this.endRow,
+      other.endCol > this.endCol ? other.endCol : this.endCol,
+    );
   }
 
   /**
