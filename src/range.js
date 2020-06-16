@@ -1,7 +1,7 @@
 import { expr2xy } from './alphabet';
 
 /**
- * the range spendColfied by a start position and an end position,
+ * the range specified by a start position and an end position,
  * the smallest range must contain at least one cell.
  * Range is not a merged cell, but it can be merged as a single cell
  * @author myliang
