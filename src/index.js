@@ -5,6 +5,19 @@ import Canvas2d from './canvas2d';
 import { newRange } from './range';
 import Viewport from './viewport';
 
+function throttle(func, wait = 50) {
+  let timer = 0;
+  return function (...args) {
+    const context = this;
+    if (!timer) {
+      timer = setTimeout(() => {
+        timer = 0;
+        func.call(context, ...args);
+      }, wait);
+    }
+  };
+}
+
 function bind(target, eventName, func) {
   target.addEventListener(eventName, func);
 }
@@ -15,12 +28,13 @@ function unbind(target, eventName, func) {
 
 function bindMouseMoveUp(target, moveFunc, upFunc) {
   bind(target, 'mousemove', moveFunc);
-  target.bindMouseUp = (evt) => {
+  target.bindMouseup = (evt) => {
     unbind(target, 'mousemove', moveFunc);
-    unbind(target, 'mouseup', target.bindMouseUp);
+    unbind(target, 'mouseup', target.bindMouseup);
+    delete target.bindMouseup;
     upFunc(evt);
   };
-  bind(target, 'mouseup', target.bindMouseup);
+  bind(window, 'mouseup', target.bindMouseup);
 }
 
 /**
@@ -202,13 +216,13 @@ class Table {
         const range = viewport.range(evt.offsetX, evt.offsetY);
         this.selection(range);
         viewport.render(draw);
-        bindMouseMoveUp(el, (e) => {
+        bindMouseMoveUp(el, throttle((e) => {
           const nrange = viewport.range(e.offsetX, e.offsetY);
           if (!nrange.within(range)) {
             this.selection(range.union(nrange));
             viewport.render(draw);
           }
-        }, () => {});
+        }), () => {});
       });
     }
     viewport.render(draw);
