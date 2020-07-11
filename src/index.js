@@ -2,7 +2,7 @@
 /* eslint func-names: ["error", "never"] */
 import { stringAt, expr2xy } from './alphabet';
 import Canvas2d from './canvas2d';
-import { newRange } from './range';
+import { newRange, eachRanges } from './range';
 import Viewport from './viewport';
 
 function throttle(func, wait = 50) {
@@ -169,9 +169,6 @@ class Table {
   // count of cols scrolled
   $scrollCols = 0;
 
-  // count of cols scrolled after freeze
-  $oldScrollCols = 0;
-
   // freezed cell
   $freeze = 'A1';
 
@@ -219,7 +216,12 @@ class Table {
         bindMouseMoveUp(el, throttle((e) => {
           const nrange = viewport.range(e.offsetX, e.offsetY);
           if (!nrange.within(range)) {
-            this.selection(range.union(nrange));
+            this.$selection = range.union(nrange);
+            eachRanges(this.$merges, (it) => {
+              if (it.intersects(this.$selection)) {
+                this.$selection = it.union(this.$selection);
+              }
+            });
             viewport.render(draw);
           }
         }), () => {});
