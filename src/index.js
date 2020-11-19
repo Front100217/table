@@ -59,8 +59,6 @@ function bindMouseMoveUp(target, moveFunc, upFunc) {
  * }
  */
 class Table {
-  $drawMap = new Map();
-
   // the count of rows
   $rows = 100;
 
@@ -187,49 +185,52 @@ class Table {
 
   $onSelected = () => {};
 
-  constructor(width, height) {
+  constructor(cssSelector, width, height) {
+    this.$target = document.querySelector(cssSelector);
+    this.$draw = Canvas2d.create(this.$target);
     this.$width = width;
     this.$height = height;
   }
 
-  // target: cssSelector | element
-  to(target) {
-    const { $drawMap } = this;
-    let el = target;
-    if (typeof target === 'string') {
-      el = document.querySelector(target);
-    }
-    let draw = $drawMap.get(el);
-    const viewport = new Viewport(this);
-    if (!$drawMap.has(el)) {
-      draw = Canvas2d.create(el);
-      $drawMap.set(el, draw);
-      // bind events
-      bind(el, 'click', (evt) => {
-        const cell = viewport.cell(evt.offsetX, evt.offsetY);
-        this.$onClick(...cell, evt);
-      });
-      bind(el, 'mousedown', (evt) => {
-        const range = viewport.range(evt.offsetX, evt.offsetY);
-        this.selection(range);
-        viewport.render(draw);
-        bindMouseMoveUp(el, throttle((e) => {
-          const nrange = viewport.range(e.offsetX, e.offsetY);
-          if (!nrange.within(range)) {
-            this.$selection = range.union(nrange);
-            eachRanges(this.$merges, (it) => {
-              if (it.intersects(this.$selection)) {
-                this.$selection = it.union(this.$selection);
-              }
-            });
-            viewport.render(draw);
-          }
-        }), () => {});
-      });
-    }
-    viewport.render(draw);
+  render() {
+    this.viewport.render(this.$draw);
     return this;
   }
+
+  get viewport() {
+    return new Viewport(this);
+  }
+
+  /**
+  render() {
+    const viewport = new Viewport(this);
+    const { $draw, $target } = this; 
+    // bind events
+    bind($target, 'click', (evt) => {
+      const cell = viewport.cell(evt.offsetX, evt.offsetY);
+      this.$onClick(...cell, evt);
+    });
+    bind($target, 'mousedown', (evt) => {
+      const range = viewport.range(evt.offsetX, evt.offsetY);
+      this.selection(range);
+      viewport.render($draw);
+      bindMouseMoveUp($target, throttle((e) => {
+        const nrange = viewport.range(e.offsetX, e.offsetY);
+        if (!nrange.within(range)) {
+          this.$selection = range.union(nrange);
+          eachRanges(this.$merges, (it) => {
+            if (it.intersects(this.$selection)) {
+              this.$selection = it.union(this.$selection);
+            }
+          });
+          viewport.render($draw);
+        }
+      }), () => {});
+    });
+    viewport.render($draw);
+    return this;
+  }
+  */
 
   // ref: 'A1:B2' | 'A:B' | '1:4' | 'A1'
   selection(ref) {
@@ -259,8 +260,8 @@ class Table {
     return this;
   }
 
-  static create(width, height) {
-    return new Table(width, height);
+  static create(cssSelector, width, height) {
+    return new Table(cssSelector, width, height);
   }
 }
 

@@ -118,9 +118,13 @@ function renderRowHeader(draw, area) {
   // render row-index
   if (width > 0) {
     draw.save().translate(0, area.y);
-    const nselection = this.$selection.clone();
-    nselection.startCol = 0;
-    nselection.endCol = 0;
+    const { $selection } = this;
+    let nselection = null;
+    if ($selection) {
+      nselection = this.$selection.clone();
+      nselection.startCol = 0;
+      nselection.endCol = 0;
+    }
     renderLinesAndCells(draw, 'row-header', area,
       cell, this.$headerCellStyle, this.$headerLineStyle,
       nselection, this.$selectionStyle);
@@ -133,9 +137,13 @@ function renderColHeader(draw, area) {
   // render col-index
   if (height > 0) {
     draw.save().translate(area.x, 0);
-    const nselection = this.$selection.clone();
-    nselection.startRow = 0;
-    nselection.endRow = area.endRow;
+    const { $selection } = this;
+    let nselection = null;
+    if ($selection) {
+      nselection = this.$selection.clone();
+      nselection.startRow = 0;
+      nselection.endRow = area.endRow;
+    }
     renderLinesAndCells(draw, 'col-header', area,
       cell, this.$headerCellStyle, this.$headerLineStyle,
       nselection, this.$selectionStyle, merges);
