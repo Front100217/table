@@ -168,7 +168,7 @@ class Table {
   $scrollCols = 0;
 
   // freezed cell
-  $freeze = 'A1';
+  $freeze = [0, 0];
 
   $freezeLineStyle = {
     width: 2,
@@ -185,9 +185,10 @@ class Table {
 
   $onSelected = () => {};
 
-  constructor(cssSelector, width, height) {
-    this.$target = document.querySelector(cssSelector);
-    this.$draw = Canvas2d.create(this.$target);
+  constructor(container, width, height) {
+    const target = document.createElement('canvas');
+    (typeof container === 'string' ? document.querySelector(container) : container).appendChild(target);
+    this.$draw = Canvas2d.create(target);
     this.$width = width;
     this.$height = height;
   }

@@ -16,7 +16,4 @@ Table.create('#table', 800, 500)
   .scrollRows(2)
   .scrollCols(1)
   .cell((ri, ci) => cellText(ri, ci))
-  .onClick((type, cell) => {
-    console.log('click.type:', type, ', cell:', cell);
-  })
   .render();
